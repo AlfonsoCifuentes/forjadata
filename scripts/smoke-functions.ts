@@ -9,6 +9,7 @@ const localSettingsPath = fileURLToPath(new URL('../apps/api/local.settings.json
 const port = 7071
 const baseUrl = `http://127.0.0.1:${port}`
 const output: string[] = []
+let spawnError: Error | null = null
 const funcCommand =
   process.platform === 'win32' && process.env.APPDATA
     ? join(
@@ -51,12 +52,17 @@ const child = spawn(funcCommand, ['start', '--port', String(port)], {
     FUNCTIONS_WORKER_RUNTIME: 'node',
     FUNCTIONS_NODE_BLOCK_ON_ENTRY_POINT_ERROR: 'true',
   },
+  detached: process.platform !== 'win32',
   windowsHide: true,
   stdio: ['ignore', 'pipe', 'pipe'],
 })
 
 child.stdout.on('data', (chunk: Buffer) => output.push(chunk.toString()))
 child.stderr.on('data', (chunk: Buffer) => output.push(chunk.toString()))
+child.on('error', (error) => {
+  spawnError = error
+  output.push(error.stack ?? error.message)
+})
 
 try {
   const response = await waitForHealth()
@@ -71,11 +77,7 @@ try {
   console.error(output.join('').slice(-20_000))
   throw error
 } finally {
-  child.kill()
-  await Promise.race([
-    new Promise<void>((resolve) => child.once('exit', () => resolve())),
-    new Promise<void>((resolve) => setTimeout(resolve, 2_000)),
-  ])
+  await terminateFunctionHost()
   await rm(localSettingsPath, { force: true })
 }
 
@@ -83,6 +85,7 @@ async function waitForHealth(): Promise<Response> {
   const deadline = Date.now() + 40_000
   let notFoundCount = 0
   while (Date.now() < deadline) {
+    if (spawnError) throw spawnError
     if (child.exitCode !== null) {
       throw new Error(`Azure Functions terminó con código ${child.exitCode}.`)
     }
@@ -99,4 +102,38 @@ async function waitForHealth(): Promise<Response> {
     await new Promise((resolve) => setTimeout(resolve, 500))
   }
   throw new Error('Azure Functions no respondió en 40 segundos.')
+}
+
+async function terminateFunctionHost(): Promise<void> {
+  if (child.exitCode === null) signalFunctionHost('SIGTERM')
+
+  const exited = await Promise.race([
+    new Promise<true>((resolve) => child.once('exit', () => resolve(true))),
+    new Promise<false>((resolve) => setTimeout(() => resolve(false), 2_000)),
+  ])
+
+  if (!exited && child.exitCode === null) {
+    signalFunctionHost('SIGKILL')
+    await Promise.race([
+      new Promise<void>((resolve) => child.once('exit', () => resolve())),
+      new Promise<void>((resolve) => setTimeout(resolve, 2_000)),
+    ])
+  }
+
+  child.stdout.destroy()
+  child.stderr.destroy()
+  child.unref()
+}
+
+function signalFunctionHost(signal: NodeJS.Signals): void {
+  if (!child.pid) return
+  try {
+    if (process.platform === 'win32') {
+      child.kill(signal)
+    } else {
+      process.kill(-child.pid, signal)
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
+  }
 }
