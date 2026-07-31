@@ -31,7 +31,7 @@ jobs:
       - run: pnpm infra:validate
       - run: pnpm test:coverage
       - run: pnpm test:performance
-      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm --filter @forjadata/web exec playwright install --with-deps chromium
       - run: pnpm --filter @forjadata/web test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
