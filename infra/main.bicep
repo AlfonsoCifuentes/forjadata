@@ -178,7 +178,6 @@ module functionApp './modules/function-app.bicep' = {
     tags: tags
     appServicePlanId: appServicePlan.outputs.resourceId
     storageAccountName: storage.outputs.name
-    storageBlobEndpoint: storage.outputs.blobEndpoint
     deploymentStorageContainerName: deploymentStorageContainerName
     identityResourceId: functionIdentity.outputs.resourceId
     identityClientId: functionIdentity.outputs.clientId

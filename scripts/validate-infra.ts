@@ -43,6 +43,12 @@ assertIncludes(main, "targetScope = 'subscription'", 'subscription-scoped entry 
 assertIncludes(main, "name: 'FC1'", 'Flex Consumption FC1')
 assertIncludes(main, 'maximumInstanceCount: 3', 'bounded Functions scale')
 assertIncludes(main, "SAP_MODE: 'disabled'", 'honest disabled SAP cloud mode')
+assertIncludes(
+  functions,
+  'keyVaultReferenceIdentity: identityResourceId',
+  'Key Vault UAMI reference identity',
+)
+assertIncludes(functions, 'AzureWebJobsStorage__accountName:', 'storage account identity prefix')
 assertIncludes(functions, "AzureWebJobsStorage__credential: 'managedidentity'", 'storage UAMI')
 assertIncludes(functions, 'AzureWebJobsStorage__clientId:', 'storage UAMI client ID')
 assertIncludes(
@@ -54,6 +60,16 @@ assertIncludes(main, "ServiceBusConnection__credential: 'managedidentity'", 'Ser
 assertIncludes(main, 'ServiceBusConnection__clientId:', 'Service Bus UAMI client ID')
 assertIncludes(storage, "skuName: 'Standard_LRS'", 'LRS storage')
 assertIncludes(storage, 'allowSharedKeyAccess: false', 'RBAC-only storage')
+assertIncludes(
+  storage,
+  "'974c5e8b-45b9-4653-ba55-5f855dd0fb88'",
+  'Storage Queue Data Contributor role',
+)
+assertIncludes(
+  storage,
+  "'0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'",
+  'Storage Table Data Contributor role',
+)
 assertIncludes(serviceBus, "name: 'Basic'", 'Service Bus Basic')
 assertIncludes(serviceBus, 'disableLocalAuth: true', 'RBAC-only Service Bus')
 assertIncludes(postgres, "skuName: 'Standard_B1ms'", 'PostgreSQL free-benefit-compatible SKU')

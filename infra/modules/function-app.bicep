@@ -5,7 +5,6 @@ param location string = resourceGroup().location
 param tags object = {}
 param appServicePlanId string
 param storageAccountName string
-param storageBlobEndpoint string
 param deploymentStorageContainerName string
 param identityResourceId string
 param identityClientId string
@@ -16,7 +15,7 @@ param instanceMemoryMB int = 2048
 param maximumInstanceCount int = 3
 
 var baseAppSettings = {
-  AzureWebJobsStorage__blobServiceUri: storageBlobEndpoint
+  AzureWebJobsStorage__accountName: storageAccountName
   AzureWebJobsStorage__credential: 'managedidentity'
   AzureWebJobsStorage__clientId: identityClientId
   APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${identityClientId};Authorization=AAD'
@@ -44,6 +43,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   }
   properties: {
     serverFarmId: appServicePlanId
+    keyVaultReferenceIdentity: identityResourceId
     httpsOnly: true
     publicNetworkAccess: 'Enabled'
     functionAppConfig: {
@@ -87,4 +87,3 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
 output name string = functionApp.name
 output resourceId string = functionApp.id
 output uri string = 'https://${functionApp.properties.defaultHostName}'
-

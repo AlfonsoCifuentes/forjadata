@@ -8,6 +8,8 @@ param deployerPrincipalId string
 param deploymentContainerName string
 
 var blobOwnerRole = 'b7e6dc6d-f1e8-4753-8033-0f276bb0955b'
+var queueContributorRole = '974c5e8b-45b9-4653-ba55-5f855dd0fb88'
+var tableContributorRole = '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3'
 
 module storage 'br/public:avm/res/storage/storage-account:0.33.0' = {
   name: 'storage-account'
@@ -61,6 +63,16 @@ module storage 'br/public:avm/res/storage/storage-account:0.33.0' = {
           principalType: 'ServicePrincipal'
           roleDefinitionIdOrName: blobOwnerRole
         }
+        {
+          principalId: functionPrincipalId
+          principalType: 'ServicePrincipal'
+          roleDefinitionIdOrName: queueContributorRole
+        }
+        {
+          principalId: functionPrincipalId
+          principalType: 'ServicePrincipal'
+          roleDefinitionIdOrName: tableContributorRole
+        }
       ],
       empty(deployerPrincipalId)
         ? []
@@ -79,4 +91,3 @@ module storage 'br/public:avm/res/storage/storage-account:0.33.0' = {
 output name string = storage.outputs.name
 output resourceId string = storage.outputs.resourceId
 output blobEndpoint string = storage.outputs.primaryBlobEndpoint
-
