@@ -1,8 +1,6 @@
 # Forjadata — Estado de implementación
 
-> Fuente principal de requisitos: `F:\Descargas\FORJADATA_MASTER_SPEC (1).md`, versión 1.0, 30 de julio de 2026.  
-> Última actualización: 30 de julio de 2026.  
-> Estado global: **P0, P1, P2 y QA/portfolio completos localmente; publicación y Azure en curso**.
+> Fuente principal de requisitos: `F:\Descargas\FORJADATA_MASTER_SPEC (1).md`, versión 1.0, 30 de julio de 2026. Última actualización: 31 de julio de 2026. Estado global: **P0, P1, P2 y QA/portfolio completos localmente; publicación y Azure en curso**.
 
 ## Resumen
 
@@ -20,8 +18,8 @@ La entrega se ejecutará en orden estricto P0 → P1 → P2. Cada integración s
 | D — P0 completo    | Shell, auth demo, dashboard, solicitudes, upload, form, AG Grid, workflow, duplicados, SAP, tests, README | Completada       | Matriz P0 cubierta y `pnpm verify` superado                              |
 | E — P1 completo    | Entra, Blob, Functions, Service Bus, OpenAPI, audit, UAT, i18n, observabilidad, Bicep                     | En curso         | Local completo; falta preview, despliegue y smoke Azure                  |
 | F — P2 completo    | Document Intelligence, modelo Azure, OData, 3D, visual regression, reglas avanzadas, email                | Completada local | Implementaciones configurables, contratos, E2E y `pnpm verify` superados |
-| G — QA y portfolio | A11y, seguridad, rendimiento, case study, guía de entrevista, demo y trazabilidad                         | En curso         | Local completo; falta fresh install desde GitHub                         |
-| H — Publicación    | Repositorio GitHub, CI, despliegue Vercel y smoke de producción                                           | Pendiente        | URLs públicas verificadas                                                |
+| G — QA y portfolio | A11y, seguridad, rendimiento, case study, guía de entrevista, demo y trazabilidad                         | Completada       | Clon limpio, instalación, verificación y reset reproducibles             |
+| H — Publicación    | Repositorio GitHub, CI, despliegue Vercel y smoke de producción                                           | En curso         | GitHub público; falta corregir CI y publicar/verificar Vercel            |
 
 ## Backlog activo
 
@@ -117,7 +115,7 @@ La entrega se ejecutará en orden estricto P0 → P1 → P2. Cada integración s
 - [x] Añadir secret scan, exclusión AG Grid Enterprise, audit sin CVE, CodeQL y dependency review.
 - [x] Completar documentación de producto, arquitectura, QA, UAT, operaciones y portfolio ES/EN.
 - [x] Documentar y probar reset determinista, guion de 90 segundos y recorrido < 3 minutos.
-- [ ] Repetir instalación y verificación desde un clon limpio del repositorio publicado.
+- [x] Repetir instalación y verificación desde un clon limpio del repositorio publicado.
 
 ## Decisiones iniciales
 
@@ -134,19 +132,20 @@ Estas decisiones se formalizarán en `docs/adr`.
 
 ## Bloqueos y riesgos
 
-| Elemento                   | Estado                        | Tratamiento                                                                     |
-| -------------------------- | ----------------------------- | ------------------------------------------------------------------------------- |
-| Objetivo Azure             | Autorizado con coste cero     | Free Trial únicamente; nunca retirar spending limit ni migrar a pago por uso    |
-| Sesión Azure CLI           | Verificada                    | CLI 2.88.0; suscripción vacía; usuario Owner; sin políticas restrictivas        |
-| Sesión Azure Developer CLI | Requiere interacción          | Completar el login abierto para ejecutar el preview obligatorio de AZD          |
-| Protección financiera      | Verificada                    | USD 200 disponibles, USD 0 pendientes y `spendingLimit = On`                    |
-| Cuota Azure OpenAI         | Verificada                    | 500K en East US 2; despliegue `gpt-5-mini` limitado a 1K TPM                    |
-| Entorno SAP real           | No disponible                 | SAP Simulator + adaptadores OData + contrato                                    |
-| Base de datos cloud        | Validada, no aprovisionada    | PostgreSQL 18 B1ms/32 GiB en North Europe; bootstrap idempotente                |
-| Repositorio GitHub         | Aún no creado                 | Publicar el cierre local ya verificado                                          |
-| Proyecto Vercel            | CLI local con sesión caducada | Probar conector Vercel tras build; si tampoco está autenticado, requerirá login |
-| Azure Functions Core Tools | Validado (`func` 4.12.1)      | `pnpm test:functions` arranca el host, consulta health y lo detiene             |
-| Alcance elevado            | Riesgo alto                   | Vertical slice primero, automatización, trazabilidad y prioridad estricta       |
+| Elemento                   | Estado                     | Tratamiento                                                                  |
+| -------------------------- | -------------------------- | ---------------------------------------------------------------------------- |
+| Objetivo Azure             | Autorizado con coste cero  | Free Trial únicamente; nunca retirar spending limit ni migrar a pago por uso |
+| Sesión Azure CLI           | Verificada                 | CLI 2.88.0; suscripción vacía; usuario Owner; sin políticas restrictivas     |
+| Sesión Azure Developer CLI | Requiere interacción       | Completar el login abierto para ejecutar el preview obligatorio de AZD       |
+| Protección financiera      | Verificada                 | USD 200 disponibles, USD 0 pendientes y `spendingLimit = On`                 |
+| Cuota Azure OpenAI         | Verificada                 | 500K en East US 2; despliegue `gpt-5-mini` limitado a 1K TPM                 |
+| Entorno SAP real           | No disponible              | SAP Simulator + adaptadores OData + contrato                                 |
+| Base de datos cloud        | Validada, no aprovisionada | PostgreSQL 18 B1ms/32 GiB en North Europe; bootstrap idempotente             |
+| Repositorio GitHub         | Publicado                  | `https://github.com/AlfonsoCifuentes/forjadata`; rama `main` pública         |
+| CI GitHub                  | Corrección pendiente       | CodeQL correcto; CI requiere instalar Core Tools v4 antes del smoke `func`   |
+| Proyecto Vercel            | Cuenta conectada           | Importación Git pendiente de autorización para usar la sesión de Chrome      |
+| Azure Functions Core Tools | Validado (`func` 4.12.1)   | `pnpm test:functions` arranca el host, consulta health y lo detiene          |
+| Alcance elevado            | Riesgo alto                | Vertical slice primero, automatización, trazabilidad y prioridad estricta    |
 
 La preparación y el uso de la prueba gratuita están autorizados con un límite personal de
 EUR 0. El despliegue debe permanecer dentro de las cuotas gratuitas o del crédito promocional,
@@ -181,11 +180,14 @@ real siguen siendo una dependencia externa para cerrar P2 sin simulador.
 | 2026-07-30 | G    | Lighthouse        | 3/3: 1,00 en performance, accessibility, best practices y SEO           |
 | 2026-07-30 | G    | Security          | Secret/licencia check correcto; `pnpm audit --prod` sin CVE             |
 | 2026-07-30 | G    | Demo reset        | Seed demo determinista: 40 materiales y 8 solicitudes                   |
+| 2026-07-31 | G    | Fresh clone       | Commit `4481968`; install, `pnpm verify` y `pnpm demo:reset` correctos  |
+| 2026-07-31 | H    | GitHub            | Repositorio público; CodeQL correcto; CI falla solo por `func` ausente  |
 
 ## Próximos pasos
 
-1. Completar el login interactivo de AZD y ejecutar `azd provision --preview --no-prompt`.
-2. Cerrar `azure-validate`, desplegar P1 y verificar cada integración real en Azure.
-3. Publicar en GitHub, verificar un clon limpio y desplegar la SPA demo en Vercel.
-4. Obtener un endpoint SAP OData y secretos mediante un canal seguro para la prueba real.
-5. Registrar URLs, smokes públicos, costes observados y cierre final.
+1. Instalar Azure Functions Core Tools v4 en GitHub Actions y confirmar el CI completo.
+2. Importar GitHub en Vercel, desplegar la SPA demo y ejecutar el smoke público.
+3. Completar el login interactivo de AZD y ejecutar `azd provision --preview --no-prompt`.
+4. Cerrar `azure-validate`, desplegar P1 y verificar cada integración real en Azure.
+5. Obtener un endpoint SAP OData y secretos mediante un canal seguro para la prueba real.
+6. Registrar URLs, smokes públicos, costes observados y cierre final.

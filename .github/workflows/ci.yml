@@ -22,6 +22,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install Azure Functions Core Tools v4
+        run: npm install --global azure-functions-core-tools@4 --unsafe-perm true
+      - name: Verify Azure Functions Core Tools
+        run: func --version
       - run: pnpm security:check
       - run: pnpm verify
       - run: pnpm infra:validate
