@@ -1,0 +1,95 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "Forjadata procedural demo asset",
+    "copyright": "CC0-1.0"
+  },
+  "scene": 0,
+  "scenes": [{ "nodes": [0] }],
+  "nodes": [
+    { "name": "Industrial motor", "children": [1, 2, 3, 4, 5] },
+    { "name": "Housing", "mesh": 0, "scale": [2.2, 1.25, 1.25] },
+    { "name": "Shaft", "mesh": 1, "translation": [1.55, 0, 0], "scale": [0.9, 0.34, 0.34] },
+    {
+      "name": "Terminal box",
+      "mesh": 2,
+      "translation": [-0.15, 0.93, 0],
+      "scale": [0.72, 0.55, 0.72]
+    },
+    {
+      "name": "Left foot",
+      "mesh": 2,
+      "translation": [-0.9, -0.78, 0],
+      "scale": [0.72, 0.25, 0.88]
+    },
+    {
+      "name": "Right foot",
+      "mesh": 2,
+      "translation": [0.9, -0.78, 0],
+      "scale": [0.72, 0.25, 0.88]
+    }
+  ],
+  "materials": [
+    {
+      "name": "Forja teal",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [0.039, 0.58, 0.55, 1],
+        "metallicFactor": 0.62,
+        "roughnessFactor": 0.32
+      }
+    },
+    {
+      "name": "Machined steel",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [0.62, 0.68, 0.72, 1],
+        "metallicFactor": 0.92,
+        "roughnessFactor": 0.18
+      }
+    },
+    {
+      "name": "Graphite",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [0.12, 0.15, 0.18, 1],
+        "metallicFactor": 0.45,
+        "roughnessFactor": 0.5
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Housing mesh",
+      "primitives": [{ "attributes": { "POSITION": 0, "NORMAL": 1 }, "indices": 2, "material": 0 }]
+    },
+    {
+      "name": "Shaft mesh",
+      "primitives": [{ "attributes": { "POSITION": 0, "NORMAL": 1 }, "indices": 2, "material": 1 }]
+    },
+    {
+      "name": "Graphite mesh",
+      "primitives": [{ "attributes": { "POSITION": 0, "NORMAL": 1 }, "indices": 2, "material": 2 }]
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 648,
+      "uri": "data:application/octet-stream;base64,AAAAPwAAAL8AAAC/AAAAPwAAAD8AAAC/AAAAPwAAAD8AAAA/AAAAPwAAAL8AAAA/AAAAvwAAAL8AAAA/AAAAvwAAAD8AAAA/AAAAvwAAAD8AAAC/AAAAvwAAAL8AAAC/AAAAvwAAAD8AAAC/AAAAvwAAAD8AAAA/AAAAPwAAAD8AAAA/AAAAPwAAAD8AAAC/AAAAvwAAAL8AAAA/AAAAvwAAAL8AAAC/AAAAPwAAAL8AAAC/AAAAPwAAAL8AAAA/AAAAvwAAAL8AAAA/AAAAPwAAAL8AAAA/AAAAPwAAAD8AAAA/AAAAvwAAAD8AAAA/AAAAPwAAAL8AAAC/AAAAvwAAAL8AAAC/AAAAvwAAAD8AAAC/AAAAPwAAAD8AAAC/AACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAABAAIAAAACAAMABAAFAAYABAAGAAcACAAJAAoACAAKAAsADAANAA4ADAAOAA8AEAARABIAEAASABMAFAAVABYAFAAWABcA"
+    }
+  ],
+  "bufferViews": [
+    { "buffer": 0, "byteOffset": 0, "byteLength": 288, "target": 34962 },
+    { "buffer": 0, "byteOffset": 288, "byteLength": 288, "target": 34962 },
+    { "buffer": 0, "byteOffset": 576, "byteLength": 72, "target": 34963 }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 24,
+      "type": "VEC3",
+      "min": [-0.5, -0.5, -0.5],
+      "max": [0.5, 0.5, 0.5]
+    },
+    { "bufferView": 1, "componentType": 5126, "count": 24, "type": "VEC3" },
+    { "bufferView": 2, "componentType": 5123, "count": 36, "type": "SCALAR" }
+  ]
+}

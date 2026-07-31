@@ -1,0 +1,23 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "FUNCTIONS_NODE_BLOCK_ON_ENTRY_POINT_ERROR": "true",
+    "APP_ENV": "local",
+    "PUBLIC_APP_URL": "http://localhost:5173",
+    "AUTH_MODE": "demo",
+    "DEMO_ENABLED": "true",
+    "ENFORCE_REAL_INTEGRATIONS": "false",
+    "DATABASE_MODE": "memory",
+    "AI_MODE": "mock",
+    "DOCUMENT_MODE": "mock",
+    "SAP_MODE": "simulator",
+    "EMAIL_MODE": "log",
+    "QUEUE_MODE": "inline",
+    "STORAGE_MODE": "local",
+    "APPLICATIONINSIGHTS_SAMPLING_RATIO": "0.1",
+    "APPLICATIONINSIGHTS_TRACES_PER_SECOND": "2",
+    "CORS_ALLOWED_ORIGINS": "http://localhost:5173"
+  }
+}

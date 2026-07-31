@@ -1,0 +1,611 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../apps/api/src/generated/prisma"
+  importFileExtension = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum Role {
+  requester
+  reviewer
+  sap_specialist
+  business_analyst
+  uat_tester
+  admin
+}
+
+enum ConfigStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum RequestType {
+  CREATE
+  UPDATE
+  EXTEND
+}
+
+enum RequestPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum RequestStatus {
+  DRAFT
+  SUBMITTED
+  PROCESSING
+  NEEDS_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  REJECTED
+  READY_FOR_SAP
+  SYNCING
+  SYNCED
+  SYNC_FAILED
+  ARCHIVED
+  CANCELLED
+}
+
+enum MaterialStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  SYNCED
+  SYNC_FAILED
+  ARCHIVED
+}
+
+enum DocumentStatus {
+  UPLOADED
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+enum SuggestionStatus {
+  PENDING
+  ACCEPTED
+  MODIFIED
+  REJECTED
+}
+
+enum DuplicateResolution {
+  PENDING
+  NOT_DUPLICATE
+  LINKED
+  MERGED
+  REPLACED
+  CANCELLED
+  ESCALATED
+}
+
+enum SapJobStatus {
+  QUEUED
+  VALIDATING
+  SYNCING
+  SUCCEEDED
+  FAILED_RETRYABLE
+  FAILED_PERMANENT
+  DEAD_LETTER
+  CANCELLED
+}
+
+model Organization {
+  id        String       @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String       @unique
+  status    ConfigStatus @default(ACTIVE)
+  createdAt DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime     @updatedAt @db.Timestamptz(3)
+
+  users        UserOrganizationRole[]
+  categories   Category[]
+  requests     MaterialRequest[]
+  materials    Material[]
+  qualityRules QualityRule[]
+  auditEvents  AuditEvent[]
+
+  @@index([status, createdAt])
+}
+
+model User {
+  id                 String     @id @default(uuid()) @db.Uuid
+  externalIdentityId String?    @unique
+  email              String     @unique
+  displayName        String
+  avatarUrl          String?
+  status             UserStatus @default(ACTIVE)
+  lastLoginAt        DateTime?  @db.Timestamptz(3)
+  createdAt          DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime   @updatedAt @db.Timestamptz(3)
+
+  organizations UserOrganizationRole[]
+  requested     MaterialRequest[]      @relation("Requester")
+  assigned      MaterialRequest[]      @relation("Assignee")
+  auditEvents   AuditEvent[]
+  notifications Notification[]
+
+  @@index([status, createdAt])
+}
+
+model UserOrganizationRole {
+  userId         String       @db.Uuid
+  organizationId String       @db.Uuid
+  role           Role
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([userId, organizationId, role])
+  @@index([organizationId, role])
+}
+
+model Category {
+  id             String                @id @default(uuid()) @db.Uuid
+  organizationId String?               @db.Uuid
+  name           String
+  slug           String
+  description    String
+  icon           String?
+  version        Int                   @default(1)
+  status         ConfigStatus          @default(ACTIVE)
+  createdAt      DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime              @updatedAt @db.Timestamptz(3)
+  organization   Organization?         @relation(fields: [organizationId], references: [id])
+  attributes     AttributeDefinition[]
+  requests       MaterialRequest[]
+  materials      Material[]
+  qualityRules   QualityRule[]
+
+  @@unique([organizationId, slug, version])
+  @@index([organizationId, status])
+}
+
+model AttributeDefinition {
+  id               String                   @id @default(uuid()) @db.Uuid
+  categoryId       String                   @db.Uuid
+  code             String
+  label            String
+  description      String
+  dataType         String
+  unitFamily       String?
+  allowedUnits     Json
+  required         Boolean                  @default(false)
+  order            Int
+  validationSchema Json
+  aliases          Json
+  sapField         String?
+  status           ConfigStatus             @default(ACTIVE)
+  version          Int                      @default(1)
+  category         Category                 @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  values           MaterialAttributeValue[]
+
+  @@unique([categoryId, code, version])
+  @@index([categoryId, status, order])
+}
+
+model MaterialRequest {
+  id                 String          @id @default(uuid()) @db.Uuid
+  organizationId     String          @db.Uuid
+  type               RequestType
+  title              String
+  description        String
+  priority           RequestPriority @default(MEDIUM)
+  status             RequestStatus   @default(DRAFT)
+  requesterId        String          @db.Uuid
+  assigneeId         String?         @db.Uuid
+  materialId         String?         @unique @db.Uuid
+  categoryId         String?         @db.Uuid
+  processingProgress Int             @default(0)
+  processingStage    String?
+  submittedAt        DateTime?       @db.Timestamptz(3)
+  dueAt              DateTime        @db.Timestamptz(3)
+  approvedAt         DateTime?       @db.Timestamptz(3)
+  syncedAt           DateTime?       @db.Timestamptz(3)
+  createdAt          DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime        @updatedAt @db.Timestamptz(3)
+  version            Int             @default(1)
+  organization       Organization    @relation(fields: [organizationId], references: [id])
+  requester          User            @relation("Requester", fields: [requesterId], references: [id])
+  assignee           User?           @relation("Assignee", fields: [assigneeId], references: [id])
+  category           Category?       @relation(fields: [categoryId], references: [id])
+  material           Material?       @relation(fields: [materialId], references: [id])
+  documents          Document[]
+  aiRuns             AiRun[]
+  syncJobs           SapSyncJob[]
+
+  @@index([organizationId, status, createdAt])
+  @@index([requesterId, status])
+  @@index([assigneeId, status])
+}
+
+model Material {
+  id                     String                   @id @default(uuid()) @db.Uuid
+  organizationId         String                   @db.Uuid
+  internalCode           String
+  sapProductId           String?
+  shortDescription       String
+  longDescription        String
+  categoryId             String                   @db.Uuid
+  manufacturer           String
+  manufacturerPartNumber String?
+  gtin                   String?
+  baseUnit               String
+  status                 MaterialStatus           @default(DRAFT)
+  completenessScore      Decimal                  @db.Decimal(5, 4)
+  confidenceScore        Decimal                  @db.Decimal(5, 4)
+  source                 String
+  createdAt              DateTime                 @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime                 @updatedAt @db.Timestamptz(3)
+  version                Int                      @default(1)
+  organization           Organization             @relation(fields: [organizationId], references: [id])
+  category               Category                 @relation(fields: [categoryId], references: [id])
+  request                MaterialRequest?
+  attributes             MaterialAttributeValue[]
+  suggestions            AiSuggestion[]
+  duplicateSources       DuplicateCase[]          @relation("DuplicateSource")
+  duplicateCandidates    DuplicateCase[]          @relation("DuplicateCandidate")
+  syncJobs               SapSyncJob[]
+  qualityResults         QualityResult[]
+
+  @@unique([organizationId, internalCode])
+  @@unique([organizationId, sapProductId])
+  @@index([organizationId, status, updatedAt])
+  @@index([categoryId, status])
+  @@index([manufacturer, manufacturerPartNumber])
+  @@index([gtin])
+}
+
+model MaterialAttributeValue {
+  id                    String              @id @default(uuid()) @db.Uuid
+  materialId            String              @db.Uuid
+  attributeDefinitionId String              @db.Uuid
+  valueJson             Json
+  normalizedValueJson   Json
+  unit                  String?
+  status                String
+  source                String
+  confidence            Decimal?            @db.Decimal(5, 4)
+  evidenceId            String?             @db.Uuid
+  reviewedBy            String?             @db.Uuid
+  reviewedAt            DateTime?           @db.Timestamptz(3)
+  createdAt             DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime            @updatedAt @db.Timestamptz(3)
+  material              Material            @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  attributeDefinition   AttributeDefinition @relation(fields: [attributeDefinitionId], references: [id])
+  evidence              Evidence?           @relation(fields: [evidenceId], references: [id])
+
+  @@unique([materialId, attributeDefinitionId])
+  @@index([materialId, status])
+}
+
+model Document {
+  id                String               @id @default(uuid()) @db.Uuid
+  requestId         String               @db.Uuid
+  organizationId    String               @db.Uuid
+  fileName          String
+  sanitizedFileName String
+  mimeType          String
+  size              Int
+  sha256            String
+  blobPath          String
+  status            DocumentStatus       @default(UPLOADED)
+  pageCount         Int?
+  language          String?
+  createdBy         String               @db.Uuid
+  createdAt         DateTime             @default(now()) @db.Timestamptz(3)
+  deletedAt         DateTime?            @db.Timestamptz(3)
+  request           MaterialRequest      @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  extractions       DocumentExtraction[]
+  evidence          Evidence[]
+
+  @@index([organizationId, sha256])
+  @@index([requestId, status])
+}
+
+model DocumentExtraction {
+  id              String    @id @default(uuid()) @db.Uuid
+  documentId      String    @db.Uuid
+  provider        String
+  providerVersion String
+  model           String
+  status          String
+  contentJson     Json
+  rawStoragePath  String?
+  startedAt       DateTime  @db.Timestamptz(3)
+  completedAt     DateTime? @db.Timestamptz(3)
+  errorCode       String?
+  errorMessage    String?
+  document        Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, status])
+}
+
+model AiRun {
+  id            String          @id @default(uuid()) @db.Uuid
+  requestId     String          @db.Uuid
+  provider      String
+  deployment    String
+  modelVersion  String
+  promptVersion String
+  status        String
+  inputHash     String
+  tokensInput   Int?
+  tokensOutput  Int?
+  latencyMs     Int
+  costEstimate  Decimal?        @db.Decimal(12, 6)
+  startedAt     DateTime        @db.Timestamptz(3)
+  completedAt   DateTime?       @db.Timestamptz(3)
+  error         String?
+  request       MaterialRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  suggestions   AiSuggestion[]
+
+  @@index([requestId, status])
+}
+
+model Evidence {
+  id              String                   @id @default(uuid()) @db.Uuid
+  documentId      String                   @db.Uuid
+  page            Int
+  text            String
+  boundingRegions Json
+  offsetStart     Int?
+  offsetEnd       Int?
+  sourceType      String
+  createdAt       DateTime                 @default(now()) @db.Timestamptz(3)
+  document        Document                 @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  attributeValues MaterialAttributeValue[]
+  suggestions     AiSuggestion[]
+
+  @@index([documentId, page])
+}
+
+model AiSuggestion {
+  id                    String           @id @default(uuid()) @db.Uuid
+  aiRunId               String           @db.Uuid
+  materialId            String           @db.Uuid
+  attributeDefinitionId String?          @db.Uuid
+  suggestionType        String
+  originalValueJson     Json
+  suggestedValueJson    Json
+  normalizedValueJson   Json
+  confidence            Decimal          @db.Decimal(5, 4)
+  reasoningSummary      String
+  evidenceId            String?          @db.Uuid
+  status                SuggestionStatus @default(PENDING)
+  reviewedBy            String?          @db.Uuid
+  reviewedAt            DateTime?        @db.Timestamptz(3)
+  createdAt             DateTime         @default(now()) @db.Timestamptz(3)
+  aiRun                 AiRun            @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  material              Material         @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  evidence              Evidence?        @relation(fields: [evidenceId], references: [id])
+
+  @@index([materialId, status])
+  @@index([aiRunId])
+}
+
+model DuplicateCase {
+  id                  String              @id @default(uuid()) @db.Uuid
+  organizationId      String              @db.Uuid
+  sourceMaterialId    String              @db.Uuid
+  candidateMaterialId String              @db.Uuid
+  score               Decimal             @db.Decimal(5, 4)
+  scoreBreakdown      Json
+  status              String
+  resolution          DuplicateResolution @default(PENDING)
+  resolvedBy          String?             @db.Uuid
+  resolvedAt          DateTime?           @db.Timestamptz(3)
+  createdAt           DateTime            @default(now()) @db.Timestamptz(3)
+  sourceMaterial      Material            @relation("DuplicateSource", fields: [sourceMaterialId], references: [id])
+  candidateMaterial   Material            @relation("DuplicateCandidate", fields: [candidateMaterialId], references: [id])
+
+  @@unique([sourceMaterialId, candidateMaterialId])
+  @@index([organizationId, status, createdAt])
+}
+
+model WorkflowInstance {
+  id                String               @id @default(uuid()) @db.Uuid
+  entityType        String
+  entityId          String
+  definitionVersion Int
+  state             RequestStatus
+  createdAt         DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime             @updatedAt @db.Timestamptz(3)
+  transitions       WorkflowTransition[]
+
+  @@unique([entityType, entityId])
+  @@index([state, updatedAt])
+}
+
+model WorkflowTransition {
+  id                 String           @id @default(uuid()) @db.Uuid
+  workflowInstanceId String           @db.Uuid
+  fromState          RequestStatus?
+  toState            RequestStatus
+  actorId            String           @db.Uuid
+  reason             String
+  metadata           Json
+  createdAt          DateTime         @default(now()) @db.Timestamptz(3)
+  workflowInstance   WorkflowInstance @relation(fields: [workflowInstanceId], references: [id], onDelete: Cascade)
+
+  @@index([workflowInstanceId, createdAt])
+}
+
+model SapSyncJob {
+  id                  String          @id @default(uuid()) @db.Uuid
+  requestId           String          @db.Uuid
+  materialId          String          @db.Uuid
+  operation           String
+  adapter             String
+  status              SapJobStatus    @default(QUEUED)
+  attemptCount        Int             @default(0)
+  maxAttempts         Int             @default(3)
+  nextAttemptAt       DateTime?       @db.Timestamptz(3)
+  requestPayloadPath  String
+  responsePayloadPath String?
+  sapProductId        String?
+  httpStatus          Int?
+  errorCode           String?
+  errorCategory       String?
+  errorMessage        String?
+  correlationId       String          @unique
+  durationMs          Int?
+  createdAt           DateTime        @default(now()) @db.Timestamptz(3)
+  startedAt           DateTime?       @db.Timestamptz(3)
+  completedAt         DateTime?       @db.Timestamptz(3)
+  request             MaterialRequest @relation(fields: [requestId], references: [id])
+  material            Material        @relation(fields: [materialId], references: [id])
+
+  @@index([status, nextAttemptAt])
+  @@index([materialId, createdAt])
+}
+
+model AuditEvent {
+  id             String       @id @default(uuid()) @db.Uuid
+  timestamp      DateTime     @default(now()) @db.Timestamptz(3)
+  actorId        String?      @db.Uuid
+  actorRole      Role
+  organizationId String       @db.Uuid
+  action         String
+  entity         String
+  entityId       String
+  before         Json?
+  after          Json?
+  metadata       Json
+  correlationId  String
+  source         String
+  outcome        String
+  actor          User?        @relation(fields: [actorId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, timestamp])
+  @@index([entity, entityId, timestamp])
+  @@index([correlationId])
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  type      String
+  title     String
+  body      String
+  link      String
+  severity  String
+  readAt    DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt DateTime? @db.Timestamptz(3)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model FeatureFlag {
+  key         String   @id
+  enabled     Boolean  @default(false)
+  environment String
+  payload     Json
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([environment, enabled])
+}
+
+model QualityRule {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @db.Uuid
+  categoryId     String?         @db.Uuid
+  code           String
+  name           String
+  description    String
+  severity       String
+  expressionJson Json
+  message        String
+  status         ConfigStatus    @default(ACTIVE)
+  version        Int             @default(1)
+  createdAt      DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime        @updatedAt @db.Timestamptz(3)
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  category       Category?       @relation(fields: [categoryId], references: [id])
+  results        QualityResult[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status, categoryId])
+}
+
+model QualityResult {
+  id          String      @id @default(uuid()) @db.Uuid
+  materialId  String      @db.Uuid
+  ruleId      String      @db.Uuid
+  status      String
+  message     String
+  detailsJson Json
+  evaluatedAt DateTime    @default(now()) @db.Timestamptz(3)
+  material    Material    @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  rule        QualityRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([materialId, evaluatedAt])
+  @@index([ruleId, status])
+}
+
+/// Snapshot transaccional del agregado de demostración/portfolio.
+/// Las tablas normalizadas siguen siendo el modelo empresarial canónico; este registro
+/// permite que el mismo recorrido interactivo sobreviva a instancias serverless y workers.
+model RuntimeState {
+  key           String   @id
+  schemaVersion Int
+  snapshot      Json
+  version       Int      @default(1)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+}
+
+model UatRelease {
+  id         String         @id @default(uuid()) @db.Uuid
+  version    String         @unique
+  name       String
+  status     String
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
+  scenarios  UatScenario[]
+  executions UatExecution[]
+}
+
+model UatScenario {
+  id          String         @id @default(uuid()) @db.Uuid
+  releaseId   String         @db.Uuid
+  code        String
+  title       String
+  description String
+  steps       Json
+  priority    String
+  release     UatRelease     @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  executions  UatExecution[]
+
+  @@unique([releaseId, code])
+}
+
+model UatExecution {
+  id          String      @id @default(uuid()) @db.Uuid
+  releaseId   String      @db.Uuid
+  scenarioId  String      @db.Uuid
+  testerId    String      @db.Uuid
+  status      String
+  results     Json
+  evidence    Json
+  signedOffAt DateTime?   @db.Timestamptz(3)
+  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @db.Timestamptz(3)
+  release     UatRelease  @relation(fields: [releaseId], references: [id])
+  scenario    UatScenario @relation(fields: [scenarioId], references: [id])
+
+  @@index([releaseId, status])
+  @@index([testerId, status])
+}

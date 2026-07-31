@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: forjadata
+metadata:
+  template: forjadata@0.1.0
+
+infra:
+  provider: bicep
+  path: ./infra
+
+services:
+  api:
+    project: ./apps/api/azure
+    dist: dist
+    language: ts
+    host: function
+    remoteBuild: true
+    hooks:
+      prepackage:
+        windows:
+          shell: pwsh
+          run: pnpm --dir ../../.. package:functions
+        posix:
+          shell: sh
+          run: pnpm --dir ../../.. package:functions
+  web:
+    project: ./apps/web/azure
+    dist: dist
+    language: js
+    host: staticwebapp
+    hooks:
+      prepackage:
+        windows:
+          shell: pwsh
+          run: pnpm --dir ../../.. package:web
+        posix:
+          shell: sh
+          run: pnpm --dir ../../.. package:web
+
+hooks:
+  postprovision:
+    windows:
+      shell: pwsh
+      run: pnpm entra:redirects
+    posix:
+      shell: sh
+      run: pnpm entra:redirects

@@ -1,0 +1,47 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: forjadata
+      POSTGRES_USER: forjadata
+      POSTGRES_PASSWORD: forjadata
+    ports:
+      - '5432:5432'
+    volumes:
+      - forjadata-postgres-v18:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U forjadata -d forjadata']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+    ports:
+      - '10000:10000'
+      - '10001:10001'
+      - '10002:10002'
+    volumes:
+      - forjadata-azurite:/data
+
+  sap-simulator:
+    build:
+      context: .
+      dockerfile: apps/sap-simulator/Dockerfile
+    environment:
+      SAP_SIMULATOR_PORT: 7072
+      LOG_LEVEL: info
+    ports:
+      - '7072:7072'
+
+  mailpit:
+    image: axllent/mailpit:v1.27.8
+    profiles: [mail]
+    ports:
+      - '8025:8025'
+      - '1025:1025'
+
+volumes:
+  forjadata-postgres-v18:
+  forjadata-azurite:

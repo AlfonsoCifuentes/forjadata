@@ -1,0 +1,43 @@
+# Dependencies and build output
+node_modules/
+dist/
+apps/api/deploy/
+apps/api/azure/dist/
+apps/web/azure/dist/
+coverage/
+.lighthouseci/
+.turbo/
+*.tsbuildinfo
+apps/api/src/generated/prisma/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+local.settings.json
+!local.settings.example.json
+
+# Runtime data
+.forjadata/
+uploads/
+playwright-report/
+test-results/
+blobstorage/
+__azurite_db*
+
+# Tooling
+.eslintcache
+.vite/
+.vercel/
+.azure/runtime/
+.azure/forjadata-dev/
+.pnpm-debug.log
+
+# Editors and operating systems
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.DS_Store
+Thumbs.db
+desktop.ini

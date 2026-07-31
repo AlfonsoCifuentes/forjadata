@@ -1,0 +1,20 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  '@prisma/engines': true
+  esbuild: true
+  msw: true
+  prisma: true
+  protobufjs: true
+
+catalog:
+  zod: ^4.3.6
+  vitest: ^4.1.10
+  typescript: 5.9.3
+
+minimumReleaseAgeExclude:
+  - '@lucide/vue@1.28.0'
+  - fastify@5.11.0
+  - openai@7.2.0

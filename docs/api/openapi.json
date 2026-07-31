@@ -1,0 +1,4783 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Forjadata API",
+    "version": "0.1.0",
+    "description": "API REST para solicitudes, materiales, workflow, auditoría y sincronización. Admite modo demo local y adaptadores Azure/SAP reales configurables.",
+    "license": { "name": "MIT", "identifier": "MIT" }
+  },
+  "servers": [{ "url": "http://localhost:7071/api/v1", "description": "Local demo" }],
+  "tags": [
+    { "name": "System" },
+    { "name": "Auth" },
+    { "name": "Dashboard" },
+    { "name": "Requests" },
+    { "name": "Materials" },
+    { "name": "Duplicates" },
+    { "name": "Workflow" },
+    { "name": "SAP" },
+    { "name": "Audit" },
+    { "name": "UAT" },
+    { "name": "Notifications" },
+    { "name": "Admin" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "tags": ["System"],
+        "summary": "Comprobar liveness",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "API disponible",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": ["status", "service", "mode", "timestamp"],
+                      "properties": {
+                        "status": { "const": "healthy" },
+                        "service": { "const": "forjadata-api" },
+                        "mode": { "enum": ["demo", "entra", "real"] },
+                        "timestamp": { "type": "string", "format": "date-time" }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/readiness": {
+      "get": {
+        "operationId": "getReadiness",
+        "tags": ["System"],
+        "summary": "Comprobar dependencias",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Estado de dependencias",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": ["status", "dependencies"],
+                      "properties": {
+                        "status": { "const": "ready" },
+                        "dependencies": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/IntegrationHealth" }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "operationId": "getVersion",
+        "tags": ["System"],
+        "summary": "Leer versión desplegada",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Versión",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": ["version", "commit"],
+                      "properties": {
+                        "version": { "type": "string" },
+                        "commit": { "type": "string" }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "getMetrics",
+        "tags": ["System"],
+        "summary": "Leer métricas locales agregadas",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Métricas de proceso en modo local o demo",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": [
+                        "generatedAt",
+                        "totalRequests",
+                        "errorRequests",
+                        "errorRate",
+                        "routes"
+                      ],
+                      "properties": {
+                        "generatedAt": { "type": "string", "format": "date-time" },
+                        "totalRequests": { "type": "integer", "minimum": 0 },
+                        "errorRequests": { "type": "integer", "minimum": 0 },
+                        "errorRate": { "type": "number", "minimum": 0, "maximum": 1 },
+                        "routes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "method",
+                              "path",
+                              "status",
+                              "count",
+                              "averageDurationMs",
+                              "maxDurationMs"
+                            ],
+                            "properties": {
+                              "method": { "type": "string" },
+                              "path": { "type": "string" },
+                              "status": { "type": "integer" },
+                              "count": { "type": "integer", "minimum": 1 },
+                              "averageDurationMs": { "type": "number", "minimum": 0 },
+                              "maxDurationMs": { "type": "number", "minimum": 0 }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/features": {
+      "get": {
+        "operationId": "getFeatures",
+        "tags": ["System"],
+        "summary": "Leer feature flags",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Feature flags",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/FeatureFlags" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "operationId": "getOpenApi",
+        "tags": ["System"],
+        "summary": "Descargar OpenAPI 3.1",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Documento OpenAPI",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "getSession",
+        "tags": ["Auth"],
+        "summary": "Leer sesión actual",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Sesión",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Session" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/demo/session": {
+      "post": {
+        "operationId": "createDemoSession",
+        "tags": ["Auth"],
+        "summary": "Crear sesión demo",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Sesión creada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Session" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Rol no válido",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/RoleSelection" } }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteDemoSession",
+        "tags": ["Auth"],
+        "summary": "Cerrar sesión demo",
+        "security": [{ "demoRole": [] }],
+        "responses": { "204": { "description": "Sesión cerrada" } }
+      }
+    },
+    "/auth/demo/switch-role": {
+      "post": {
+        "operationId": "switchDemoRole",
+        "tags": ["Auth"],
+        "summary": "Cambiar rol sintético",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Sesión actualizada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/Session" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Rol no válido",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/RoleSelection" } }
+          }
+        }
+      }
+    },
+    "/dashboard/summary": {
+      "get": {
+        "operationId": "getDashboardSummary",
+        "tags": ["Dashboard"],
+        "summary": "Leer KPIs demo",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Resumen",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/DashboardSummary" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/requests": {
+      "get": {
+        "operationId": "listRequests",
+        "tags": ["Requests"],
+        "summary": "Listar solicitudes",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Página de solicitudes",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "pagination", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/RequestDetail" }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "required": ["page", "pageSize", "total", "totalPages"],
+                      "properties": {
+                        "page": { "type": "integer", "minimum": 1 },
+                        "pageSize": { "type": "integer", "minimum": 1 },
+                        "total": { "type": "integer", "minimum": 0 },
+                        "totalPages": { "type": "integer", "minimum": 1 }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Consulta no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "default": 1 }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 }
+          },
+          { "name": "search", "in": "query", "schema": { "type": "string", "maxLength": 120 } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "sortDirection",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "createRequest",
+        "tags": ["Requests"],
+        "summary": "Crear borrador",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "201": {
+            "description": "Solicitud creada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/RequestDetail" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Formulario no válido",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CreateRequestInput" } }
+          }
+        }
+      }
+    },
+    "/requests/{id}": {
+      "get": {
+        "operationId": "getRequest",
+        "tags": ["Requests"],
+        "summary": "Leer solicitud",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Detalle",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/RequestDetail" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Solicitud no encontrada",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de solicitud o material",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ]
+      }
+    },
+    "/requests/{id}/documents": {
+      "post": {
+        "operationId": "uploadRequestDocument",
+        "tags": ["Requests"],
+        "summary": "Validar y almacenar documento",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "201": {
+            "description": "Documento adjuntado",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/RequestDetail" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Solicitud no encontrada",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "422": {
+            "description": "Documento no válido",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de solicitud o material",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/UploadDocumentInput" } }
+          }
+        }
+      }
+    },
+    "/requests/{id}/submit": {
+      "post": {
+        "operationId": "submitRequest",
+        "tags": ["Workflow"],
+        "summary": "Enviar y procesar",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Solicitud procesada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/RequestDetail" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Procesamiento encolado",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/RequestDetail" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "409": {
+            "description": "Versión o transición no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de solicitud o material",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ExpectedVersion" } }
+          }
+        }
+      }
+    },
+    "/requests/{id}/processing-status": {
+      "get": {
+        "operationId": "getProcessingStatus",
+        "tags": ["Requests"],
+        "summary": "Leer progreso",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Progreso",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": ["status", "progress", "stage"],
+                      "properties": {
+                        "status": { "type": "string" },
+                        "progress": { "type": "number", "minimum": 0, "maximum": 100 },
+                        "stage": { "type": ["string", "null"] }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Solicitud no encontrada",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de solicitud o material",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ]
+      }
+    },
+    "/requests/{id}/suggestions/{suggestionId}/decision": {
+      "post": {
+        "operationId": "decideSuggestion",
+        "tags": ["Workflow"],
+        "summary": "Decidir sugerencia",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Sugerencia revisada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/RequestDetail" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "404": {
+            "description": "Sugerencia no encontrada",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "422": {
+            "description": "Decisión no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de solicitud o material",
+            "schema": { "type": "string", "minLength": 1 }
+          },
+          {
+            "name": "suggestionId",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de sugerencia",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SuggestionDecisionInput" }
+            }
+          }
+        }
+      }
+    },
+    "/requests/{id}/suggestions/bulk-accept": {
+      "post": {
+        "operationId": "acceptAllSuggestions",
+        "tags": ["Workflow"],
+        "summary": "Aceptar sugerencias pendientes",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Sugerencias aceptadas",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/RequestDetail" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de solicitud o material",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ]
+      }
+    },
+    "/requests/{id}/duplicates/{duplicateId}/resolve": {
+      "post": {
+        "operationId": "resolveDuplicate",
+        "tags": ["Duplicates"],
+        "summary": "Resolver coincidencia",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Coincidencia resuelta",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/RequestDetail" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "404": {
+            "description": "Coincidencia no encontrada",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "422": {
+            "description": "Resolución no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de solicitud o material",
+            "schema": { "type": "string", "minLength": 1 }
+          },
+          {
+            "name": "duplicateId",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de coincidencia",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DuplicateResolutionInput" }
+            }
+          }
+        }
+      }
+    },
+    "/requests/{id}/approve": {
+      "post": {
+        "operationId": "approveRequest",
+        "tags": ["Workflow"],
+        "summary": "Aprobar solicitud",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Solicitud aprobada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/RequestDetail" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "409": {
+            "description": "Versión o transición no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de solicitud o material",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/WorkflowDecision" } }
+          }
+        }
+      }
+    },
+    "/requests/{id}/request-changes": {
+      "post": {
+        "operationId": "requestChanges",
+        "tags": ["Workflow"],
+        "summary": "Solicitar cambios",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Cambios solicitados",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/RequestDetail" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "409": {
+            "description": "Versión o transición no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de solicitud o material",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/WorkflowDecision" } }
+          }
+        }
+      }
+    },
+    "/materials": {
+      "get": {
+        "operationId": "listMaterials",
+        "tags": ["Materials"],
+        "summary": "Listar materiales",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Página de materiales",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "pagination", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/MaterialSummary" }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "required": ["page", "pageSize", "total", "totalPages"],
+                      "properties": {
+                        "page": { "type": "integer", "minimum": 1 },
+                        "pageSize": { "type": "integer", "minimum": 1 },
+                        "total": { "type": "integer", "minimum": 0 },
+                        "totalPages": { "type": "integer", "minimum": 1 }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Consulta no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "default": 1 }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 25 }
+          },
+          { "name": "search", "in": "query", "schema": { "type": "string", "maxLength": 120 } },
+          { "name": "status", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string" } },
+          {
+            "name": "sortDirection",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" }
+          }
+        ]
+      }
+    },
+    "/materials/{id}": {
+      "get": {
+        "operationId": "getMaterial",
+        "tags": ["Materials"],
+        "summary": "Leer material",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Detalle",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/MaterialDetail" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Material no encontrado",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de solicitud o material",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ]
+      }
+    },
+    "/duplicate-cases": {
+      "get": {
+        "operationId": "listDuplicateCases",
+        "tags": ["Duplicates"],
+        "summary": "Listar coincidencias",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Coincidencias",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/DuplicateCase" }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sap/health": {
+      "get": {
+        "operationId": "getSapHealth",
+        "tags": ["SAP"],
+        "summary": "Comprobar adaptador SAP",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Salud SAP",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "oneOf": [
+                        { "$ref": "#/components/schemas/IntegrationHealth" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sap/jobs": {
+      "get": {
+        "operationId": "listSapJobs",
+        "tags": ["SAP"],
+        "summary": "Listar trabajos SAP",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Trabajos",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/SapSyncJob" }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/requests/{id}/sap/sync": {
+      "post": {
+        "operationId": "syncRequest",
+        "tags": ["SAP"],
+        "summary": "Sincronizar mediante el adaptador configurado",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Resultado de sincronización",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/SapSyncJob" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Sincronización encolada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/SapSyncJob" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "409": {
+            "description": "Transición no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de solicitud o material",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ExpectedVersion" } }
+          }
+        }
+      }
+    },
+    "/sap/jobs/{jobId}/retry": {
+      "post": {
+        "operationId": "retrySapJob",
+        "tags": ["SAP"],
+        "summary": "Reintentar trabajo SAP",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Trabajo reintentado",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/SapSyncJob" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Reintento encolado",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/SapSyncJob" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Trabajo no encontrado",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "description": "Identificador del trabajo SAP",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ]
+      }
+    },
+    "/sap/jobs/{jobId}/payload": {
+      "get": {
+        "operationId": "getSapPayload",
+        "tags": ["SAP"],
+        "summary": "Leer payload normalizado",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Payload",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "type": "object" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Trabajo no encontrado",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "path",
+            "required": true,
+            "description": "Identificador del trabajo SAP",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ]
+      }
+    },
+    "/audit-events": {
+      "get": {
+        "operationId": "listAuditEvents",
+        "tags": ["Audit"],
+        "summary": "Listar eventos auditables",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Eventos",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/AuditEvent" }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit-events/{id}": {
+      "get": {
+        "operationId": "getAuditEvent",
+        "tags": ["Audit"],
+        "summary": "Leer evento auditable",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Evento",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/AuditEvent" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Evento no encontrado",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador del evento",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ]
+      }
+    },
+    "/audit-events/export": {
+      "get": {
+        "operationId": "exportAuditEvents",
+        "tags": ["Audit"],
+        "summary": "Exportar eventos en CSV",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "CSV sintético sin secretos ni documentos completos",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador de correlación",
+                "schema": { "type": "string" }
+              },
+              "content-disposition": {
+                "description": "Nombre de archivo sugerido",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": { "text/csv": { "schema": { "type": "string" } } }
+          }
+        }
+      }
+    },
+    "/uat/releases": {
+      "get": {
+        "operationId": "listUatReleases",
+        "tags": ["UAT"],
+        "summary": "Listar releases de aceptación",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Releases",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/UatRelease" }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createUatRelease",
+        "tags": ["UAT"],
+        "summary": "Crear release de aceptación",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "201": {
+            "description": "Release creada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/UatRelease" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "409": {
+            "description": "Versión duplicada",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "422": {
+            "description": "Entrada no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateUatReleaseInput" }
+            }
+          }
+        }
+      }
+    },
+    "/uat/releases/{id}": {
+      "get": {
+        "operationId": "getUatRelease",
+        "tags": ["UAT"],
+        "summary": "Leer release de aceptación",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Release",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/UatRelease" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Release no encontrada",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador del recurso UAT",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ]
+      }
+    },
+    "/uat/releases/{id}/plans": {
+      "post": {
+        "operationId": "createUatPlan",
+        "tags": ["UAT"],
+        "summary": "Crear plan para una release",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "201": {
+            "description": "Plan creado",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/UatPlan" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "404": {
+            "description": "Release o escenario no encontrado",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "422": {
+            "description": "Entrada no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador del recurso UAT",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/CreateUatPlanInput" } }
+          }
+        }
+      }
+    },
+    "/uat/plans/{id}": {
+      "get": {
+        "operationId": "getUatPlan",
+        "tags": ["UAT"],
+        "summary": "Leer plan de aceptación",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Plan",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/UatPlan" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Plan no encontrado",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador del recurso UAT",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ]
+      }
+    },
+    "/uat/executions": {
+      "post": {
+        "operationId": "createUatExecution",
+        "tags": ["UAT"],
+        "summary": "Iniciar ejecución de escenario",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "201": {
+            "description": "Ejecución creada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/UatExecution" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "404": {
+            "description": "Recurso UAT no encontrado",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "422": {
+            "description": "Entrada no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateUatExecutionInput" }
+            }
+          }
+        }
+      }
+    },
+    "/uat/executions/{id}": {
+      "patch": {
+        "operationId": "updateUatExecution",
+        "tags": ["UAT"],
+        "summary": "Registrar resultado y pasos",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Ejecución actualizada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/UatExecution" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "404": {
+            "description": "Ejecución no encontrada",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "422": {
+            "description": "Entrada no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador del recurso UAT",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateUatExecutionInput" }
+            }
+          }
+        }
+      }
+    },
+    "/uat/executions/{id}/evidence": {
+      "post": {
+        "operationId": "addUatEvidence",
+        "tags": ["UAT"],
+        "summary": "Añadir evidencia UAT verificable",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "201": {
+            "description": "Evidencia registrada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/UatExecution" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "404": {
+            "description": "Ejecución no encontrada",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "422": {
+            "description": "Entrada no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador del recurso UAT",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/AddUatEvidenceInput" } }
+          }
+        }
+      }
+    },
+    "/uat/executions/{id}/sign-off": {
+      "post": {
+        "operationId": "signOffUatExecution",
+        "tags": ["UAT"],
+        "summary": "Firmar una ejecución",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Ejecución firmada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/UatExecution" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "404": {
+            "description": "Ejecución no encontrada",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "422": {
+            "description": "Entrada no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador del recurso UAT",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SignOffUatExecutionInput" }
+            }
+          }
+        }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "operationId": "listNotifications",
+        "tags": ["Notifications"],
+        "summary": "Listar notificaciones",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Notificaciones",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Notification" }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/unread-count": {
+      "get": {
+        "operationId": "getUnreadNotificationCount",
+        "tags": ["Notifications"],
+        "summary": "Contar notificaciones pendientes",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Contador",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "required": ["count"],
+                      "properties": { "count": { "type": "integer", "minimum": 0 } }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/notifications/read-all": {
+      "post": {
+        "operationId": "markAllNotificationsRead",
+        "tags": ["Notifications"],
+        "summary": "Marcar todas como leídas",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Notificaciones actualizadas",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Notification" }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/quality-rules": {
+      "get": {
+        "operationId": "listQualityRules",
+        "tags": ["Admin"],
+        "summary": "Listar reglas de calidad versionadas",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Reglas de calidad",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/QualityRule" }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createQualityRule",
+        "tags": ["Admin"],
+        "summary": "Crear una regla de calidad",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "201": {
+            "description": "Regla creada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/QualityRule" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "422": {
+            "description": "Entrada no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateQualityRuleInput" }
+            }
+          }
+        }
+      }
+    },
+    "/admin/quality-rules/{id}": {
+      "patch": {
+        "operationId": "updateQualityRule",
+        "tags": ["Admin"],
+        "summary": "Versionar una regla de calidad",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Regla actualizada",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/QualityRule" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "404": {
+            "description": "Regla no encontrada",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflicto de versión",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "422": {
+            "description": "Entrada no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de regla de calidad",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateQualityRuleInput" }
+            }
+          }
+        }
+      }
+    },
+    "/admin/quality-rules/{id}/test": {
+      "post": {
+        "operationId": "testQualityRule",
+        "tags": ["Admin"],
+        "summary": "Probar una regla contra un material",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Resultado de la regla",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "$ref": "#/components/schemas/QualityResult" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol sin permiso",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "404": {
+            "description": "Regla o material no encontrado",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          },
+          "422": {
+            "description": "Entrada no válida",
+            "content": {
+              "application/problem+json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador de regla de calidad",
+            "schema": { "type": "string", "minLength": 1 }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TestQualityRuleInput" }
+            }
+          }
+        }
+      }
+    },
+    "/admin/integrations": {
+      "get": {
+        "operationId": "listIntegrationHealth",
+        "tags": ["Admin"],
+        "summary": "Listar modos y salud de integraciones",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Integraciones",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/IntegrationHealth" }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/demo/reset": {
+      "post": {
+        "operationId": "resetDemo",
+        "tags": ["Admin"],
+        "summary": "Restablecer dataset sintético",
+        "security": [{ "demoRole": [] }],
+        "responses": {
+          "200": {
+            "description": "Dataset restablecido",
+            "headers": {
+              "x-correlation-id": {
+                "description": "Identificador para correlacionar logs y operaciones",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["data", "meta"],
+                  "properties": {
+                    "data": { "type": "object" },
+                    "meta": {
+                      "type": "object",
+                      "required": ["correlationId"],
+                      "properties": { "correlationId": { "type": "string" } }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "demoRole": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-demo-role",
+        "description": "Selector de rol sintético. No es un mecanismo de autenticación de producción."
+      }
+    },
+    "schemas": {
+      "Role": {
+        "type": "string",
+        "enum": [
+          "requester",
+          "reviewer",
+          "sap_specialist",
+          "business_analyst",
+          "uat_tester",
+          "admin"
+        ]
+      },
+      "Session": {
+        "type": "object",
+        "properties": {
+          "mode": { "type": "string", "enum": ["demo", "entra"] },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "pattern": "^(?!\\.)(?!.*\\.\\.)([A-Za-z0-9_'+\\-\\.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+              },
+              "displayName": { "type": "string", "minLength": 1 },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "requester",
+                  "reviewer",
+                  "sap_specialist",
+                  "business_analyst",
+                  "uat_tester",
+                  "admin"
+                ]
+              },
+              "organizationId": { "type": "string" },
+              "organizationName": { "type": "string" },
+              "avatarInitials": { "type": "string", "minLength": 1, "maxLength": 3 }
+            },
+            "required": [
+              "id",
+              "email",
+              "displayName",
+              "role",
+              "organizationId",
+              "organizationName",
+              "avatarInitials"
+            ],
+            "additionalProperties": false
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "request:create",
+                "request:read",
+                "request:update",
+                "request:submit",
+                "request:review",
+                "request:approve",
+                "request:reject",
+                "duplicate:resolve",
+                "sap:sync",
+                "sap:retry",
+                "dashboard:global",
+                "audit:read",
+                "uat:execute",
+                "admin:manage"
+              ]
+            }
+          },
+          "issuedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": ["mode", "user", "permissions", "issuedAt", "expiresAt"],
+        "additionalProperties": false
+      },
+      "DashboardSummary": {
+        "type": "object",
+        "properties": {
+          "mode": { "type": "string", "const": "demo" },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "requestsCreated": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "processed": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "pendingReview": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "approved": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "synced": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "failed": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "averageCycleHours": { "type": "number", "minimum": 0 },
+          "averageConfidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "aiAcceptanceRate": { "type": "number", "minimum": 0, "maximum": 1 },
+          "duplicatesPrevented": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "slaAtRisk": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "workflow": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "DRAFT",
+                    "SUBMITTED",
+                    "PROCESSING",
+                    "NEEDS_REVIEW",
+                    "CHANGES_REQUESTED",
+                    "APPROVED",
+                    "REJECTED",
+                    "READY_FOR_SAP",
+                    "SYNCING",
+                    "SYNCED",
+                    "SYNC_FAILED",
+                    "ARCHIVED",
+                    "CANCELLED"
+                  ]
+                },
+                "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+              },
+              "required": ["status", "count"],
+              "additionalProperties": false
+            }
+          },
+          "categoryBreakdown": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": { "type": "string" },
+                "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+              },
+              "required": ["category", "count"],
+              "additionalProperties": false
+            }
+          },
+          "weeklyTrend": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "week": { "type": "string" },
+                "created": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "completed": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+              },
+              "required": ["week", "created", "completed"],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "mode",
+          "generatedAt",
+          "requestsCreated",
+          "processed",
+          "pendingReview",
+          "approved",
+          "synced",
+          "failed",
+          "averageCycleHours",
+          "averageConfidence",
+          "aiAcceptanceRate",
+          "duplicatesPrevented",
+          "slaAtRisk",
+          "workflow",
+          "categoryBreakdown",
+          "weeklyTrend"
+        ],
+        "additionalProperties": false
+      },
+      "RequestDetail": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string", "enum": ["CREATE", "UPDATE", "EXTEND"] },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "priority": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "SUBMITTED",
+              "PROCESSING",
+              "NEEDS_REVIEW",
+              "CHANGES_REQUESTED",
+              "APPROVED",
+              "REJECTED",
+              "READY_FOR_SAP",
+              "SYNCING",
+              "SYNCED",
+              "SYNC_FAILED",
+              "ARCHIVED",
+              "CANCELLED"
+            ]
+          },
+          "requesterName": { "type": "string" },
+          "assigneeName": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "category": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "processingProgress": { "type": "number", "minimum": 0, "maximum": 100 },
+          "processingStage": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "QUEUED",
+                  "UPLOADING",
+                  "EXTRACTING",
+                  "CLASSIFYING",
+                  "NORMALIZING",
+                  "CHECKING_RULES",
+                  "SEARCHING_DUPLICATES",
+                  "CALCULATING_CONFIDENCE",
+                  "READY_FOR_REVIEW",
+                  "FAILED"
+                ]
+              },
+              { "type": "null" }
+            ]
+          },
+          "confidenceScore": {
+            "anyOf": [{ "type": "number", "minimum": 0, "maximum": 1 }, { "type": "null" }]
+          },
+          "materialId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "dueAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "version": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "fileName": { "type": "string" },
+                "mimeType": { "type": "string" },
+                "size": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "sha256": { "type": "string" },
+                "storagePath": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                "status": {
+                  "type": "string",
+                  "enum": ["UPLOADED", "PROCESSING", "PROCESSED", "FAILED"]
+                },
+                "pageCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "provider": { "type": "string" }
+              },
+              "required": [
+                "id",
+                "fileName",
+                "mimeType",
+                "size",
+                "sha256",
+                "storagePath",
+                "status",
+                "pageCount",
+                "provider"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "attributeCode": { "type": "string" },
+                "label": { "type": "string" },
+                "originalValue": {
+                  "anyOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" },
+                    { "type": "null" }
+                  ]
+                },
+                "suggestedValue": {
+                  "anyOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" },
+                    { "type": "null" }
+                  ]
+                },
+                "normalizedValue": {
+                  "anyOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" },
+                    { "type": "null" }
+                  ]
+                },
+                "unit": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                "reasoningSummary": { "type": "string" },
+                "evidenceText": { "type": "string" },
+                "evidencePage": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["PENDING", "ACCEPTED", "MODIFIED", "REJECTED"]
+                },
+                "provider": { "type": "string", "minLength": 1 },
+                "providerVersion": { "type": "string" }
+              },
+              "required": [
+                "id",
+                "attributeCode",
+                "label",
+                "originalValue",
+                "suggestedValue",
+                "normalizedValue",
+                "unit",
+                "confidence",
+                "reasoningSummary",
+                "evidenceText",
+                "evidencePage",
+                "status",
+                "provider",
+                "providerVersion"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "duplicateCases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "sourceMaterialId": { "type": "string" },
+                "candidateMaterialId": { "type": "string" },
+                "sourceDescription": { "type": "string" },
+                "candidateDescription": { "type": "string" },
+                "score": { "type": "number", "minimum": 0, "maximum": 1 },
+                "scoreBreakdown": {
+                  "type": "object",
+                  "properties": {
+                    "manufacturer": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "model": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "description": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "attributes": { "type": "number", "minimum": 0, "maximum": 1 }
+                  },
+                  "required": ["manufacturer", "model", "description", "attributes"],
+                  "additionalProperties": false
+                },
+                "resolution": {
+                  "type": "string",
+                  "enum": [
+                    "PENDING",
+                    "NOT_DUPLICATE",
+                    "LINKED",
+                    "MERGED",
+                    "REPLACED",
+                    "CANCELLED",
+                    "ESCALATED"
+                  ]
+                },
+                "explanation": { "type": "string" },
+                "resolvedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "resolvedBy": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
+              },
+              "required": [
+                "id",
+                "sourceMaterialId",
+                "candidateMaterialId",
+                "sourceDescription",
+                "candidateDescription",
+                "score",
+                "scoreBreakdown",
+                "resolution",
+                "explanation",
+                "resolvedAt",
+                "resolvedBy"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "workflow": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "fromState": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "DRAFT",
+                        "SUBMITTED",
+                        "PROCESSING",
+                        "NEEDS_REVIEW",
+                        "CHANGES_REQUESTED",
+                        "APPROVED",
+                        "REJECTED",
+                        "READY_FOR_SAP",
+                        "SYNCING",
+                        "SYNCED",
+                        "SYNC_FAILED",
+                        "ARCHIVED",
+                        "CANCELLED"
+                      ]
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "toState": {
+                  "type": "string",
+                  "enum": [
+                    "DRAFT",
+                    "SUBMITTED",
+                    "PROCESSING",
+                    "NEEDS_REVIEW",
+                    "CHANGES_REQUESTED",
+                    "APPROVED",
+                    "REJECTED",
+                    "READY_FOR_SAP",
+                    "SYNCING",
+                    "SYNCED",
+                    "SYNC_FAILED",
+                    "ARCHIVED",
+                    "CANCELLED"
+                  ]
+                },
+                "actorName": { "type": "string" },
+                "actorRole": {
+                  "type": "string",
+                  "enum": [
+                    "requester",
+                    "reviewer",
+                    "sap_specialist",
+                    "business_analyst",
+                    "uat_tester",
+                    "admin"
+                  ]
+                },
+                "reason": { "type": "string" },
+                "source": { "type": "string", "enum": ["UI", "API", "WORKER", "SYSTEM"] },
+                "correlationId": { "type": "string" },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                }
+              },
+              "required": [
+                "id",
+                "fromState",
+                "toState",
+                "actorName",
+                "actorRole",
+                "reason",
+                "source",
+                "correlationId",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "title",
+          "description",
+          "priority",
+          "status",
+          "requesterName",
+          "assigneeName",
+          "category",
+          "processingProgress",
+          "processingStage",
+          "confidenceScore",
+          "materialId",
+          "dueAt",
+          "createdAt",
+          "updatedAt",
+          "version",
+          "documents",
+          "suggestions",
+          "duplicateCases",
+          "workflow"
+        ],
+        "additionalProperties": false
+      },
+      "MaterialSummary": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "internalCode": { "type": "string" },
+          "sapProductId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "shortDescription": { "type": "string" },
+          "category": { "type": "string" },
+          "manufacturer": { "type": "string" },
+          "manufacturerPartNumber": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "baseUnit": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "IN_REVIEW", "APPROVED", "SYNCED", "SYNC_FAILED", "ARCHIVED"]
+          },
+          "completenessScore": { "type": "number", "minimum": 0, "maximum": 1 },
+          "confidenceScore": { "type": "number", "minimum": 0, "maximum": 1 },
+          "duplicateCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "ownerName": { "type": "string" },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "slaStatus": { "type": "string", "enum": ["ON_TRACK", "AT_RISK", "OVERDUE"] }
+        },
+        "required": [
+          "id",
+          "internalCode",
+          "sapProductId",
+          "shortDescription",
+          "category",
+          "manufacturer",
+          "manufacturerPartNumber",
+          "baseUnit",
+          "status",
+          "completenessScore",
+          "confidenceScore",
+          "duplicateCount",
+          "ownerName",
+          "updatedAt",
+          "slaStatus"
+        ],
+        "additionalProperties": false
+      },
+      "MaterialDetail": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "internalCode": { "type": "string" },
+          "sapProductId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "shortDescription": { "type": "string" },
+          "category": { "type": "string" },
+          "manufacturer": { "type": "string" },
+          "manufacturerPartNumber": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "baseUnit": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "IN_REVIEW", "APPROVED", "SYNCED", "SYNC_FAILED", "ARCHIVED"]
+          },
+          "completenessScore": { "type": "number", "minimum": 0, "maximum": 1 },
+          "confidenceScore": { "type": "number", "minimum": 0, "maximum": 1 },
+          "duplicateCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "ownerName": { "type": "string" },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "slaStatus": { "type": "string", "enum": ["ON_TRACK", "AT_RISK", "OVERDUE"] },
+          "longDescription": { "type": "string" },
+          "gtin": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "source": { "type": "string", "enum": ["DEMO", "MANUAL", "AI", "SAP"] },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "code": { "type": "string" },
+                "label": { "type": "string" },
+                "value": {
+                  "anyOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" },
+                    { "type": "null" }
+                  ]
+                },
+                "normalizedValue": {
+                  "anyOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" },
+                    { "type": "null" }
+                  ]
+                },
+                "unit": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                "required": { "type": "boolean" },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "EMPTY",
+                    "SUGGESTED",
+                    "ACCEPTED",
+                    "MODIFIED",
+                    "REJECTED",
+                    "INVALID",
+                    "LOCKED"
+                  ]
+                },
+                "confidence": {
+                  "anyOf": [{ "type": "number", "minimum": 0, "maximum": 1 }, { "type": "null" }]
+                },
+                "evidenceText": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                "evidencePage": {
+                  "anyOf": [
+                    { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+                    { "type": "null" }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "label",
+                "value",
+                "normalizedValue",
+                "unit",
+                "required",
+                "status",
+                "confidence",
+                "evidenceText",
+                "evidencePage"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "requestId": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
+        },
+        "required": [
+          "id",
+          "internalCode",
+          "sapProductId",
+          "shortDescription",
+          "category",
+          "manufacturer",
+          "manufacturerPartNumber",
+          "baseUnit",
+          "status",
+          "completenessScore",
+          "confidenceScore",
+          "duplicateCount",
+          "ownerName",
+          "updatedAt",
+          "slaStatus",
+          "longDescription",
+          "gtin",
+          "source",
+          "attributes",
+          "requestId"
+        ],
+        "additionalProperties": false
+      },
+      "AiSuggestion": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "attributeCode": { "type": "string" },
+          "label": { "type": "string" },
+          "originalValue": {
+            "anyOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" },
+              { "type": "null" }
+            ]
+          },
+          "suggestedValue": {
+            "anyOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" },
+              { "type": "null" }
+            ]
+          },
+          "normalizedValue": {
+            "anyOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" },
+              { "type": "null" }
+            ]
+          },
+          "unit": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "reasoningSummary": { "type": "string" },
+          "evidenceText": { "type": "string" },
+          "evidencePage": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "status": { "type": "string", "enum": ["PENDING", "ACCEPTED", "MODIFIED", "REJECTED"] },
+          "provider": { "type": "string", "minLength": 1 },
+          "providerVersion": { "type": "string" }
+        },
+        "required": [
+          "id",
+          "attributeCode",
+          "label",
+          "originalValue",
+          "suggestedValue",
+          "normalizedValue",
+          "unit",
+          "confidence",
+          "reasoningSummary",
+          "evidenceText",
+          "evidencePage",
+          "status",
+          "provider",
+          "providerVersion"
+        ],
+        "additionalProperties": false
+      },
+      "DuplicateCase": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "sourceMaterialId": { "type": "string" },
+          "candidateMaterialId": { "type": "string" },
+          "sourceDescription": { "type": "string" },
+          "candidateDescription": { "type": "string" },
+          "score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "scoreBreakdown": {
+            "type": "object",
+            "properties": {
+              "manufacturer": { "type": "number", "minimum": 0, "maximum": 1 },
+              "model": { "type": "number", "minimum": 0, "maximum": 1 },
+              "description": { "type": "number", "minimum": 0, "maximum": 1 },
+              "attributes": { "type": "number", "minimum": 0, "maximum": 1 }
+            },
+            "required": ["manufacturer", "model", "description", "attributes"],
+            "additionalProperties": false
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "NOT_DUPLICATE",
+              "LINKED",
+              "MERGED",
+              "REPLACED",
+              "CANCELLED",
+              "ESCALATED"
+            ]
+          },
+          "explanation": { "type": "string" },
+          "resolvedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "resolvedBy": { "anyOf": [{ "type": "string" }, { "type": "null" }] }
+        },
+        "required": [
+          "id",
+          "sourceMaterialId",
+          "candidateMaterialId",
+          "sourceDescription",
+          "candidateDescription",
+          "score",
+          "scoreBreakdown",
+          "resolution",
+          "explanation",
+          "resolvedAt",
+          "resolvedBy"
+        ],
+        "additionalProperties": false
+      },
+      "SapSyncJob": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "requestId": { "type": "string" },
+          "materialId": { "type": "string" },
+          "operation": { "type": "string", "enum": ["CREATE", "UPDATE"] },
+          "adapter": { "type": "string", "enum": ["simulator", "odata-v2", "odata-v4"] },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "VALIDATING",
+              "SYNCING",
+              "SUCCEEDED",
+              "FAILED_RETRYABLE",
+              "FAILED_PERMANENT",
+              "DEAD_LETTER",
+              "CANCELLED"
+            ]
+          },
+          "attemptCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "maxAttempts": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "nextAttemptAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "sapProductId": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "httpStatus": {
+            "anyOf": [
+              { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              { "type": "null" }
+            ]
+          },
+          "errorCode": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "errorCategory": {
+            "anyOf": [
+              { "type": "string", "enum": ["BUSINESS", "TECHNICAL", "AUTH", "TIMEOUT"] },
+              { "type": "null" }
+            ]
+          },
+          "errorMessage": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "correlationId": { "type": "string" },
+          "durationMs": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+          "payload": {
+            "type": "object",
+            "properties": {
+              "internalCode": { "type": "string" },
+              "description": { "type": "string", "minLength": 1, "maxLength": 120 },
+              "category": { "type": "string" },
+              "manufacturer": { "type": "string" },
+              "manufacturerPartNumber": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+              "baseUnit": { "type": "string" },
+              "attributes": {
+                "type": "object",
+                "propertyNames": { "type": "string" },
+                "additionalProperties": {
+                  "anyOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" },
+                    { "type": "null" }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "internalCode",
+              "description",
+              "category",
+              "manufacturer",
+              "manufacturerPartNumber",
+              "baseUnit",
+              "attributes"
+            ],
+            "additionalProperties": false
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "requestId",
+          "materialId",
+          "operation",
+          "adapter",
+          "status",
+          "attemptCount",
+          "maxAttempts",
+          "nextAttemptAt",
+          "sapProductId",
+          "httpStatus",
+          "errorCode",
+          "errorCategory",
+          "errorMessage",
+          "correlationId",
+          "durationMs",
+          "payload",
+          "createdAt",
+          "completedAt"
+        ],
+        "additionalProperties": false
+      },
+      "AuditEvent": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "actorName": { "type": "string" },
+          "actorRole": {
+            "type": "string",
+            "enum": [
+              "requester",
+              "reviewer",
+              "sap_specialist",
+              "business_analyst",
+              "uat_tester",
+              "admin"
+            ]
+          },
+          "organizationId": { "type": "string" },
+          "action": { "type": "string" },
+          "entity": { "type": "string" },
+          "entityId": { "type": "string" },
+          "summary": { "type": "string" },
+          "before": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": { "type": "string" },
+                "additionalProperties": {}
+              },
+              { "type": "null" }
+            ]
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "object",
+                "propertyNames": { "type": "string" },
+                "additionalProperties": {}
+              },
+              { "type": "null" }
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": {}
+          },
+          "ipHash": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "userAgent": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "correlationId": { "type": "string" },
+          "source": { "type": "string", "enum": ["UI", "API", "WORKER", "SYSTEM"] },
+          "outcome": { "type": "string", "enum": ["SUCCESS", "FAILURE", "DENIED"] }
+        },
+        "required": [
+          "id",
+          "timestamp",
+          "actorName",
+          "actorRole",
+          "organizationId",
+          "action",
+          "entity",
+          "entityId",
+          "summary",
+          "before",
+          "after",
+          "metadata",
+          "ipHash",
+          "userAgent",
+          "correlationId",
+          "source",
+          "outcome"
+        ],
+        "additionalProperties": false
+      },
+      "UatRelease": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "version": { "type": "string" },
+          "name": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "IN_EXECUTION", "APPROVED", "REJECTED", "BLOCKED"]
+          },
+          "plans": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "releaseId": { "type": "string" },
+                "name": { "type": "string" },
+                "assignedTesterId": { "type": "string" },
+                "scenarioIds": { "type": "array", "items": { "type": "string" } },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                }
+              },
+              "required": [
+                "id",
+                "releaseId",
+                "name",
+                "assignedTesterId",
+                "scenarioIds",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "scenarios": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "code": { "type": "string" },
+                "title": { "type": "string" },
+                "description": { "type": "string" },
+                "priority": { "type": "string", "enum": ["P0", "P1", "P2"] },
+                "steps": {
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "order": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "instruction": { "type": "string" },
+                      "expectedResult": { "type": "string" }
+                    },
+                    "required": ["id", "order", "instruction", "expectedResult"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["id", "code", "title", "description", "priority", "steps"],
+              "additionalProperties": false
+            }
+          },
+          "executions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "releaseId": { "type": "string" },
+                "planId": { "type": "string" },
+                "scenarioId": { "type": "string" },
+                "testerId": { "type": "string" },
+                "status": { "type": "string", "enum": ["NOT_RUN", "PASSED", "FAILED", "BLOCKED"] },
+                "comment": { "type": "string" },
+                "stepResults": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "stepId": { "type": "string" },
+                      "result": { "type": "string", "enum": ["PASSED", "FAILED", "BLOCKED"] },
+                      "comment": { "type": "string" }
+                    },
+                    "required": ["stepId", "result", "comment"],
+                    "additionalProperties": false
+                  }
+                },
+                "evidence": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "fileName": { "type": "string" },
+                      "mimeType": { "type": "string" },
+                      "kind": { "type": "string", "enum": ["SCREENSHOT", "NOTE", "LOG"] },
+                      "comment": { "type": "string" },
+                      "storageMode": { "type": "string", "enum": ["demo-metadata", "blob"] },
+                      "storagePath": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                      "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "sha256": {
+                        "anyOf": [
+                          { "type": "string", "minLength": 64, "maxLength": 64 },
+                          { "type": "null" }
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "fileName",
+                      "mimeType",
+                      "kind",
+                      "comment",
+                      "storageMode",
+                      "storagePath",
+                      "sizeBytes",
+                      "sha256",
+                      "createdAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "issues": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "title": { "type": "string" },
+                      "severity": {
+                        "type": "string",
+                        "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+                      },
+                      "status": { "type": "string", "enum": ["OPEN", "RESOLVED"] }
+                    },
+                    "required": ["id", "title", "severity", "status"],
+                    "additionalProperties": false
+                  }
+                },
+                "signOffDecision": {
+                  "anyOf": [
+                    { "type": "string", "enum": ["APPROVED", "REJECTED", "BLOCKED"] },
+                    { "type": "null" }
+                  ]
+                },
+                "signOffComment": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                "signedOffAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                    },
+                    { "type": "null" }
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                }
+              },
+              "required": [
+                "id",
+                "releaseId",
+                "planId",
+                "scenarioId",
+                "testerId",
+                "status",
+                "comment",
+                "stepResults",
+                "evidence",
+                "issues",
+                "signOffDecision",
+                "signOffComment",
+                "signedOffAt",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "name",
+          "status",
+          "plans",
+          "scenarios",
+          "executions",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "UatPlan": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "releaseId": { "type": "string" },
+          "name": { "type": "string" },
+          "assignedTesterId": { "type": "string" },
+          "scenarioIds": { "type": "array", "items": { "type": "string" } },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": ["id", "releaseId", "name", "assignedTesterId", "scenarioIds", "createdAt"],
+        "additionalProperties": false
+      },
+      "UatExecution": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "releaseId": { "type": "string" },
+          "planId": { "type": "string" },
+          "scenarioId": { "type": "string" },
+          "testerId": { "type": "string" },
+          "status": { "type": "string", "enum": ["NOT_RUN", "PASSED", "FAILED", "BLOCKED"] },
+          "comment": { "type": "string" },
+          "stepResults": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "stepId": { "type": "string" },
+                "result": { "type": "string", "enum": ["PASSED", "FAILED", "BLOCKED"] },
+                "comment": { "type": "string" }
+              },
+              "required": ["stepId", "result", "comment"],
+              "additionalProperties": false
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "fileName": { "type": "string" },
+                "mimeType": { "type": "string" },
+                "kind": { "type": "string", "enum": ["SCREENSHOT", "NOTE", "LOG"] },
+                "comment": { "type": "string" },
+                "storageMode": { "type": "string", "enum": ["demo-metadata", "blob"] },
+                "storagePath": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+                "sizeBytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                "sha256": {
+                  "anyOf": [
+                    { "type": "string", "minLength": 64, "maxLength": 64 },
+                    { "type": "null" }
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                }
+              },
+              "required": [
+                "id",
+                "fileName",
+                "mimeType",
+                "kind",
+                "comment",
+                "storageMode",
+                "storagePath",
+                "sizeBytes",
+                "sha256",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "title": { "type": "string" },
+                "severity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+                "status": { "type": "string", "enum": ["OPEN", "RESOLVED"] }
+              },
+              "required": ["id", "title", "severity", "status"],
+              "additionalProperties": false
+            }
+          },
+          "signOffDecision": {
+            "anyOf": [
+              { "type": "string", "enum": ["APPROVED", "REJECTED", "BLOCKED"] },
+              { "type": "null" }
+            ]
+          },
+          "signOffComment": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "signedOffAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "releaseId",
+          "planId",
+          "scenarioId",
+          "testerId",
+          "status",
+          "comment",
+          "stepResults",
+          "evidence",
+          "issues",
+          "signOffDecision",
+          "signOffComment",
+          "signedOffAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "userId": { "type": "string" },
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "link": { "type": "string" },
+          "severity": { "type": "string", "enum": ["INFO", "SUCCESS", "WARNING", "ERROR"] },
+          "readAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+              },
+              { "type": "null" }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "type",
+          "title",
+          "body",
+          "link",
+          "severity",
+          "readAt",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "QualityRule": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "organizationId": { "type": "string" },
+          "category": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,39}$" },
+          "name": { "type": "string", "minLength": 3, "maxLength": 100 },
+          "description": { "type": "string", "maxLength": 500 },
+          "severity": { "type": "string", "enum": ["INFO", "WARNING", "ERROR"] },
+          "expression": {
+            "type": "object",
+            "properties": {
+              "combinator": { "type": "string", "enum": ["ALL", "ANY"] },
+              "conditions": {
+                "minItems": 1,
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": { "type": "string", "minLength": 1, "maxLength": 80 },
+                    "operator": {
+                      "type": "string",
+                      "enum": [
+                        "required",
+                        "equals",
+                        "notEquals",
+                        "contains",
+                        "gte",
+                        "lte",
+                        "between",
+                        "matches"
+                      ]
+                    },
+                    "value": {
+                      "anyOf": [
+                        { "type": "string", "maxLength": 120 },
+                        { "type": "number" },
+                        { "type": "boolean" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "secondValue": { "type": "number" }
+                  },
+                  "required": ["field", "operator"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["combinator", "conditions"],
+            "additionalProperties": false
+          },
+          "message": { "type": "string", "minLength": 3, "maxLength": 240 },
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+          "version": { "type": "integer", "exclusiveMinimum": 0, "maximum": 9007199254740991 },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "category",
+          "code",
+          "name",
+          "description",
+          "severity",
+          "expression",
+          "message",
+          "status",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "QualityResult": {
+        "type": "object",
+        "properties": {
+          "ruleId": { "type": "string" },
+          "ruleCode": { "type": "string" },
+          "status": { "type": "string", "enum": ["PASS", "FAIL", "SKIPPED"] },
+          "severity": { "type": "string", "enum": ["INFO", "WARNING", "ERROR"] },
+          "message": { "type": "string" },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "field": { "type": "string" },
+                "operator": {
+                  "type": "string",
+                  "enum": [
+                    "required",
+                    "equals",
+                    "notEquals",
+                    "contains",
+                    "gte",
+                    "lte",
+                    "between",
+                    "matches"
+                  ]
+                },
+                "actual": {
+                  "anyOf": [
+                    { "type": "string" },
+                    { "type": "number" },
+                    { "type": "boolean" },
+                    { "type": "null" }
+                  ]
+                },
+                "passed": { "type": "boolean" }
+              },
+              "required": ["field", "operator", "actual", "passed"],
+              "additionalProperties": false
+            }
+          },
+          "evaluatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          }
+        },
+        "required": [
+          "ruleId",
+          "ruleCode",
+          "status",
+          "severity",
+          "message",
+          "details",
+          "evaluatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "IntegrationHealth": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "mode": { "type": "string", "enum": ["demo", "mock", "simulator", "disabled", "real"] },
+          "status": { "type": "string", "enum": ["healthy", "degraded", "unconfigured"] },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+          },
+          "message": { "type": "string" }
+        },
+        "required": ["name", "mode", "status", "checkedAt", "message"],
+        "additionalProperties": false
+      },
+      "FeatureFlags": {
+        "type": "object",
+        "properties": {
+          "enableRealAi": { "type": "boolean" },
+          "enableDocumentIntelligence": { "type": "boolean" },
+          "enableSapOData": { "type": "boolean" },
+          "enable3dViewer": { "type": "boolean" },
+          "enableUat": { "type": "boolean" },
+          "enableArchitecturePage": { "type": "boolean" },
+          "enableBulkActions": { "type": "boolean" },
+          "enableExperimentalRulesBuilder": { "type": "boolean" }
+        },
+        "required": [
+          "enableRealAi",
+          "enableDocumentIntelligence",
+          "enableSapOData",
+          "enable3dViewer",
+          "enableUat",
+          "enableArchitecturePage",
+          "enableBulkActions",
+          "enableExperimentalRulesBuilder"
+        ],
+        "additionalProperties": false
+      },
+      "CreateRequestInput": {
+        "type": "object",
+        "properties": {
+          "type": { "default": "CREATE", "type": "string", "enum": ["CREATE", "UPDATE", "EXTEND"] },
+          "title": { "type": "string", "minLength": 5, "maxLength": 120 },
+          "description": { "type": "string", "minLength": 20, "maxLength": 2000 },
+          "priority": {
+            "default": "MEDIUM",
+            "type": "string",
+            "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+          },
+          "category": {
+            "default": null,
+            "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }]
+          },
+          "fileName": {
+            "default": null,
+            "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 180 }, { "type": "null" }]
+          }
+        },
+        "required": ["type", "title", "description", "priority", "category", "fileName"],
+        "additionalProperties": false
+      },
+      "UploadDocumentInput": {
+        "type": "object",
+        "properties": {
+          "fileName": { "type": "string", "minLength": 1, "maxLength": 180 },
+          "mimeType": {
+            "type": "string",
+            "enum": [
+              "application/pdf",
+              "image/png",
+              "image/jpeg",
+              "text/csv",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ]
+          },
+          "contentBase64": { "type": "string", "minLength": 1 }
+        },
+        "required": ["fileName", "mimeType", "contentBase64"],
+        "additionalProperties": false
+      },
+      "SuggestionDecisionInput": {
+        "type": "object",
+        "properties": {
+          "decision": { "type": "string", "enum": ["accept", "reject", "modify"] },
+          "value": {
+            "anyOf": [
+              { "type": "string" },
+              { "type": "number" },
+              { "type": "boolean" },
+              { "type": "null" }
+            ]
+          },
+          "reason": { "default": "Revisión humana", "type": "string", "maxLength": 500 }
+        },
+        "required": ["decision", "reason"],
+        "additionalProperties": false
+      },
+      "DuplicateResolutionInput": {
+        "type": "object",
+        "properties": {
+          "resolution": {
+            "type": "string",
+            "enum": ["NOT_DUPLICATE", "LINKED", "MERGED", "REPLACED", "CANCELLED", "ESCALATED"]
+          },
+          "reason": { "type": "string", "minLength": 3, "maxLength": 500 }
+        },
+        "required": ["resolution", "reason"],
+        "additionalProperties": false
+      },
+      "TransitionInput": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "SUBMIT",
+              "COMPLETE_PROCESSING",
+              "REQUEST_CHANGES",
+              "APPROVE",
+              "REJECT",
+              "PREPARE_SAP",
+              "START_SYNC",
+              "SYNC_SUCCESS",
+              "SYNC_FAILURE",
+              "RETRY_SYNC",
+              "CANCEL",
+              "ARCHIVE"
+            ]
+          },
+          "reason": { "default": "", "type": "string", "maxLength": 500 },
+          "expectedVersion": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": ["action", "reason", "expectedVersion"],
+        "additionalProperties": false
+      },
+      "CreateUatReleaseInput": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "name": { "type": "string", "minLength": 3, "maxLength": 120 }
+        },
+        "required": ["version", "name"],
+        "additionalProperties": false
+      },
+      "CreateUatPlanInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 3, "maxLength": 120 },
+          "assignedTesterId": { "default": "user-uat", "type": "string", "minLength": 1 },
+          "scenarioIds": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["name", "assignedTesterId"],
+        "additionalProperties": false
+      },
+      "CreateUatExecutionInput": {
+        "type": "object",
+        "properties": {
+          "releaseId": { "type": "string", "minLength": 1 },
+          "planId": { "type": "string", "minLength": 1 },
+          "scenarioId": { "type": "string", "minLength": 1 }
+        },
+        "required": ["releaseId", "planId", "scenarioId"],
+        "additionalProperties": false
+      },
+      "UpdateUatExecutionInput": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["NOT_RUN", "PASSED", "FAILED", "BLOCKED"] },
+          "comment": { "default": "", "type": "string", "maxLength": 1000 },
+          "stepResults": {
+            "default": [],
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "stepId": { "type": "string" },
+                "result": { "type": "string", "enum": ["PASSED", "FAILED", "BLOCKED"] },
+                "comment": { "type": "string" }
+              },
+              "required": ["stepId", "result", "comment"],
+              "additionalProperties": false
+            }
+          },
+          "issue": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string", "minLength": 3, "maxLength": 200 },
+              "severity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"] }
+            },
+            "required": ["title", "severity"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["status", "comment", "stepResults"],
+        "additionalProperties": false
+      },
+      "AddUatEvidenceInput": {
+        "type": "object",
+        "properties": {
+          "fileName": { "type": "string", "minLength": 1, "maxLength": 180 },
+          "mimeType": { "type": "string", "minLength": 1, "maxLength": 100 },
+          "kind": { "type": "string", "enum": ["SCREENSHOT", "NOTE", "LOG"] },
+          "comment": { "default": "", "type": "string", "maxLength": 500 },
+          "contentBase64": { "type": "string", "maxLength": 7000000 }
+        },
+        "required": ["fileName", "mimeType", "kind", "comment"],
+        "additionalProperties": false
+      },
+      "SignOffUatExecutionInput": {
+        "type": "object",
+        "properties": {
+          "decision": { "type": "string", "enum": ["APPROVED", "REJECTED", "BLOCKED"] },
+          "comment": { "type": "string", "minLength": 3, "maxLength": 1000 }
+        },
+        "required": ["decision", "comment"],
+        "additionalProperties": false
+      },
+      "CreateQualityRuleInput": {
+        "type": "object",
+        "properties": {
+          "category": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,39}$" },
+          "name": { "type": "string", "minLength": 3, "maxLength": 100 },
+          "description": { "type": "string", "maxLength": 500 },
+          "severity": { "type": "string", "enum": ["INFO", "WARNING", "ERROR"] },
+          "expression": {
+            "type": "object",
+            "properties": {
+              "combinator": { "type": "string", "enum": ["ALL", "ANY"] },
+              "conditions": {
+                "minItems": 1,
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": { "type": "string", "minLength": 1, "maxLength": 80 },
+                    "operator": {
+                      "type": "string",
+                      "enum": [
+                        "required",
+                        "equals",
+                        "notEquals",
+                        "contains",
+                        "gte",
+                        "lte",
+                        "between",
+                        "matches"
+                      ]
+                    },
+                    "value": {
+                      "anyOf": [
+                        { "type": "string", "maxLength": 120 },
+                        { "type": "number" },
+                        { "type": "boolean" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "secondValue": { "type": "number" }
+                  },
+                  "required": ["field", "operator"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["combinator", "conditions"],
+            "additionalProperties": false
+          },
+          "message": { "type": "string", "minLength": 3, "maxLength": 240 },
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+        },
+        "required": [
+          "category",
+          "code",
+          "name",
+          "description",
+          "severity",
+          "expression",
+          "message",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateQualityRuleInput": {
+        "type": "object",
+        "properties": {
+          "category": { "anyOf": [{ "type": "string" }, { "type": "null" }] },
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,39}$" },
+          "name": { "type": "string", "minLength": 3, "maxLength": 100 },
+          "description": { "type": "string", "maxLength": 500 },
+          "severity": { "type": "string", "enum": ["INFO", "WARNING", "ERROR"] },
+          "expression": {
+            "type": "object",
+            "properties": {
+              "combinator": { "type": "string", "enum": ["ALL", "ANY"] },
+              "conditions": {
+                "minItems": 1,
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "field": { "type": "string", "minLength": 1, "maxLength": 80 },
+                    "operator": {
+                      "type": "string",
+                      "enum": [
+                        "required",
+                        "equals",
+                        "notEquals",
+                        "contains",
+                        "gte",
+                        "lte",
+                        "between",
+                        "matches"
+                      ]
+                    },
+                    "value": {
+                      "anyOf": [
+                        { "type": "string", "maxLength": 120 },
+                        { "type": "number" },
+                        { "type": "boolean" },
+                        { "type": "null" }
+                      ]
+                    },
+                    "secondValue": { "type": "number" }
+                  },
+                  "required": ["field", "operator"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["combinator", "conditions"],
+            "additionalProperties": false
+          },
+          "message": { "type": "string", "minLength": 3, "maxLength": 240 },
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+          "expectedVersion": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "category",
+          "code",
+          "name",
+          "description",
+          "severity",
+          "expression",
+          "message",
+          "status",
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "TestQualityRuleInput": {
+        "type": "object",
+        "properties": { "materialId": { "type": "string", "minLength": 1 } },
+        "required": ["materialId"],
+        "additionalProperties": false
+      },
+      "PaginationQuery": {
+        "type": "object",
+        "properties": {
+          "page": { "default": 1, "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+          "pageSize": { "default": 25, "type": "integer", "minimum": 1, "maximum": 100 },
+          "search": { "default": "", "type": "string", "maxLength": 120 },
+          "status": { "default": "", "type": "string" },
+          "sortBy": { "default": "updatedAt", "type": "string" },
+          "sortDirection": { "default": "desc", "type": "string", "enum": ["asc", "desc"] }
+        },
+        "required": ["page", "pageSize", "search", "status", "sortBy", "sortDirection"],
+        "additionalProperties": false
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "status": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" },
+          "correlationId": { "type": "string" },
+          "errors": {
+            "type": "object",
+            "propertyNames": { "type": "string" },
+            "additionalProperties": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "required": ["type", "title", "status", "detail", "instance", "correlationId"],
+        "additionalProperties": false
+      },
+      "RoleSelection": {
+        "type": "object",
+        "required": ["role"],
+        "properties": { "role": { "$ref": "#/components/schemas/Role" } },
+        "additionalProperties": false
+      },
+      "ExpectedVersion": {
+        "type": "object",
+        "required": ["expectedVersion"],
+        "properties": { "expectedVersion": { "type": "integer", "minimum": 1 } },
+        "additionalProperties": false
+      },
+      "WorkflowDecision": {
+        "type": "object",
+        "required": ["expectedVersion", "reason"],
+        "properties": {
+          "expectedVersion": { "type": "integer", "minimum": 1 },
+          "reason": { "type": "string", "maxLength": 500 }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
