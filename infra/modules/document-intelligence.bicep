@@ -6,7 +6,7 @@ param tags object = {}
 param functionPrincipalId string
 
 module documentIntelligence 'br/public:avm/res/cognitive-services/account:0.17.0' = {
-  name: 'document-intelligence'
+  name: 'document-intelligence-account'
   params: {
     name: name
     kind: 'FormRecognizer'

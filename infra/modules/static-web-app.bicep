@@ -5,7 +5,7 @@ param location string = resourceGroup().location
 param tags object = {}
 
 module staticSite 'br/public:avm/res/web/static-site:0.9.5' = {
-  name: 'static-web-app'
+  name: 'static-site'
   params: {
     name: name
     location: location

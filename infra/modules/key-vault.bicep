@@ -8,7 +8,7 @@ param functionPrincipalId string
 param databaseUrl string
 
 module vault 'br/public:avm/res/key-vault/vault:0.14.0' = {
-  name: 'key-vault'
+  name: 'key-vault-store'
   params: {
     name: name
     location: location

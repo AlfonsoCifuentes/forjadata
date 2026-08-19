@@ -7,7 +7,7 @@ param tags object = {}
 param functionPrincipalId string
 
 module openAi 'br/public:avm/res/cognitive-services/account:0.17.0' = {
-  name: 'azure-openai'
+  name: 'openai-account'
   params: {
     name: name
     kind: 'OpenAI'
