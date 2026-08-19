@@ -18,3 +18,11 @@ minimumReleaseAgeExclude:
   - '@lucide/vue@1.28.0'
   - fastify@5.11.0
   - openai@7.2.0
+
+# Avisos de seguridad resueltos en dependencias transitivas. Cada override
+# apunta a la primera versión parcheada publicada por el mantenedor.
+overrides:
+  fast-uri@3: 3.1.5
+  fast-uri@4: 4.1.2
+  nanoid@3: 3.3.18
+  deepmerge-ts@7: 8.0.1
