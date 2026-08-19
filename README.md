@@ -6,6 +6,8 @@ Forjadata es una SPA empresarial para recibir documentos y solicitudes, extraer 
 normalizar atributos, detectar duplicados, validar decisiones humanas y sincronizar
 materiales con sistemas corporativos mediante adaptadores auditables.
 
+**Demo pública: <https://forjadata.vercel.app>**
+
 > Todos los datos incluidos son sintéticos. La demo pública utiliza proveedores
 > deterministas etiquetados como `demo`, `mock` o `simulator`; no representa conexiones
 > reales con Microsoft, Azure o SAP.

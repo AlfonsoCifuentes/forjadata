@@ -3,6 +3,8 @@
 Forjadata transforma descripciones, hojas de cálculo, imágenes y documentos sintéticos en
 registros de materiales limpios, revisables y preparados para sincronización.
 
+**Demo pública: <https://forjadata.vercel.app>**
+
 ## Arquitectura resumida
 
 El repositorio es un monorepo pnpm con una SPA Vue 3, una API modular registrada como Azure
