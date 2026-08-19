@@ -21,7 +21,6 @@ var baseAppSettings = {
   APPLICATIONINSIGHTS_AUTHENTICATION_STRING: 'ClientId=${identityClientId};Authorization=AAD'
   APPLICATIONINSIGHTS_CONNECTION_STRING: applicationInsightsConnectionString
   AZURE_CLIENT_ID: identityClientId
-  FUNCTIONS_WORKER_RUNTIME: 'node'
 }
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
@@ -63,7 +62,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       }
       runtime: {
         name: 'node'
-        version: '22'
+        version: '24'
       }
     }
     siteConfig: {
