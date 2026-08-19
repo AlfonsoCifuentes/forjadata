@@ -53,7 +53,13 @@ aprovisionar se debe ejecutar el workflow `azure-validate`, incluida la vista pr
 
 ## Despliegue y empaquetado
 
+`postgresAdministratorPassword` es un parámetro `@secure()` sin valor por defecto: se toma de
+`POSTGRES_ADMIN_PASSWORD` en el entorno de AZD. Debe fijarse una sola vez por entorno para que
+`azd provision` sea idempotente y no rote la credencial en cada ejecución. El valor queda en
+`.azure/<entorno>/.env`, que está excluido de Git.
+
 ```powershell
+azd env set POSTGRES_ADMIN_PASSWORD '<contraseña de 16+ caracteres>'
 azd provision --no-prompt
 azd deploy --no-prompt
 ```

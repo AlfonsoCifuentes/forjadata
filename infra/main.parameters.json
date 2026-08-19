@@ -22,6 +22,9 @@
     },
     "deployerPrincipalId": {
       "value": "${AZURE_PRINCIPAL_ID}"
+    },
+    "postgresAdministratorPassword": {
+      "value": "${POSTGRES_ADMIN_PASSWORD}"
     }
   }
 }

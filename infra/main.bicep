@@ -18,7 +18,8 @@ param entraSpaClientId string
 param deployerPrincipalId string = deployer().objectId
 
 @secure()
-param postgresAdministratorPassword string = newGuid()
+@minLength(16)
+param postgresAdministratorPassword string
 
 var resourceToken = take(toLower(uniqueString(subscription().id, environmentName)), 8)
 var safeEnvironmentName = take(replace(toLower(environmentName), '-', ''), 12)
