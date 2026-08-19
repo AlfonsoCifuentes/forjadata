@@ -1,6 +1,6 @@
 # Forjadata — Estado de implementación
 
-> Fuente principal de requisitos: `F:\Descargas\FORJADATA_MASTER_SPEC (1).md`, versión 1.0, 30 de julio de 2026. Última actualización: 19 de agosto de 2026. Estado global: **P0, P1, P2, QA/portfolio y publicación completos; despliegue Azure en curso**.
+> Fuente principal de requisitos: `F:\Descargas\FORJADATA_MASTER_SPEC (1).md`, versión 1.0, 30 de julio de 2026. Última actualización: 19 de agosto de 2026. Estado global: **P0, P1, P2, QA/portfolio, publicación y despliegue Azure completos**.
 
 ## Resumen
 
@@ -16,7 +16,7 @@ La entrega se ejecutará en orden estricto P0 → P1 → P2. Cada integración s
 | B — Bootstrap      | Monorepo pnpm, web, API, SAP simulator, contratos, calidad, DB, CI                                        | Completada       | `pnpm verify` superado                                                   |
 | C — Vertical slice | Login demo → dashboard → solicitud → mock processing → review → approve → SAP simulator                   | Completada       | E2E principal y `pnpm verify` superados                                  |
 | D — P0 completo    | Shell, auth demo, dashboard, solicitudes, upload, form, AG Grid, workflow, duplicados, SAP, tests, README | Completada       | Matriz P0 cubierta y `pnpm verify` superado                              |
-| E — P1 completo    | Entra, Blob, Functions, Service Bus, OpenAPI, audit, UAT, i18n, observabilidad, Bicep                     | En curso         | Local completo; falta preview, despliegue y smoke Azure                  |
+| E — P1 completo    | Entra, Blob, Functions, Service Bus, OpenAPI, audit, UAT, i18n, observabilidad, Bicep                     | Completada       | Provisionado, desplegado y smoke de integraciones reales en Azure        |
 | F — P2 completo    | Document Intelligence, modelo Azure, OData, 3D, visual regression, reglas avanzadas, email                | Completada local | Implementaciones configurables, contratos, E2E y `pnpm verify` superados |
 | G — QA y portfolio | A11y, seguridad, rendimiento, case study, guía de entrevista, demo y trazabilidad                         | Completada       | Clon limpio, instalación, verificación y reset reproducibles             |
 | H — Publicación    | Repositorio GitHub, CI, despliegue Vercel y smoke de producción                                           | Completada       | GitHub, CI, despliegue Vercel y smoke público correctos                  |
@@ -87,7 +87,7 @@ La entrega se ejecutará en orden estricto P0 → P1 → P2. Cada integración s
 - [x] Bicep modular/AZD con UAMI, RBAC, guardrails de coste y validación automatizada.
 - [x] Estado PostgreSQL serverless compartido con bootstrap idempotente y concurrencia optimista.
 - [x] Ejecutar `pnpm verify` de cierre local de P1.
-- [ ] Completar `azd provision --preview`, desplegar y ejecutar smoke de P1 en Azure.
+- [x] Completar `azd provision --preview`, desplegar y ejecutar smoke de P1 en Azure.
 
 ### Fase F — P2
 
@@ -132,20 +132,20 @@ Estas decisiones se formalizarán en `docs/adr`.
 
 ## Bloqueos y riesgos
 
-| Elemento                   | Estado                     | Tratamiento                                                                        |
-| -------------------------- | -------------------------- | ---------------------------------------------------------------------------------- |
-| Objetivo Azure             | Autorizado con coste cero  | Free Trial únicamente; nunca retirar spending limit ni migrar a pago por uso       |
-| Sesión Azure CLI           | Verificada                 | CLI 2.88.0; suscripción vacía; usuario Owner; sin políticas restrictivas           |
-| Sesión Azure Developer CLI | Requiere interacción       | Completar el login abierto para ejecutar el preview obligatorio de AZD             |
-| Protección financiera      | Verificada                 | USD 200 disponibles, USD 0 pendientes y `spendingLimit = On`                       |
-| Cuota Azure OpenAI         | Verificada                 | 500K en East US 2; despliegue `gpt-5-mini` limitado a 1K TPM                       |
-| Entorno SAP real           | No disponible              | SAP Simulator + adaptadores OData + contrato                                       |
-| Base de datos cloud        | Validada, no aprovisionada | PostgreSQL 18 B1ms/32 GiB en North Europe; bootstrap idempotente                   |
-| Repositorio GitHub         | Publicado                  | `https://github.com/AlfonsoCifuentes/forjadata`; rama `main` pública               |
-| CI GitHub                  | Verificado                 | CI y CodeQL correctos sobre `2d39ea2`; Core Tools, Lighthouse y E2E incluidos      |
-| Proyecto Vercel            | Publicado                  | `https://forjadata.vercel.app`; integración Git desplegando `main` automáticamente |
-| Azure Functions Core Tools | Validado (`func` 4.12.1)   | `pnpm test:functions` arranca el host, consulta health y lo detiene                |
-| Alcance elevado            | Riesgo alto                | Vertical slice primero, automatización, trazabilidad y prioridad estricta          |
+| Elemento                   | Estado                    | Tratamiento                                                                        |
+| -------------------------- | ------------------------- | ---------------------------------------------------------------------------------- |
+| Objetivo Azure             | Autorizado con coste cero | Free Trial únicamente; nunca retirar spending limit ni migrar a pago por uso       |
+| Sesión Azure CLI           | Verificada                | CLI 2.88.0; suscripción vacía; usuario Owner; sin políticas restrictivas           |
+| Sesión Azure Developer CLI | Verificada                | AZD 1.29.0 autenticado; `provision` y `deploy` ejecutados sin interacción          |
+| Protección financiera      | Verificada                | USD 200 disponibles, USD 0 pendientes y `spendingLimit = On`                       |
+| Cuota Azure OpenAI         | Verificada                | 500K en East US 2; despliegue `gpt-5-mini` limitado a 1K TPM                       |
+| Entorno SAP real           | No disponible             | SAP Simulator + adaptadores OData + contrato                                       |
+| Base de datos cloud        | Aprovisionada             | `psql-forjadata-tzyeclde` B1ms/32 GiB en North Europe; bootstrap idempotente       |
+| Repositorio GitHub         | Publicado                 | `https://github.com/AlfonsoCifuentes/forjadata`; rama `main` pública               |
+| CI GitHub                  | Verificado                | CI y CodeQL correctos sobre `2d39ea2`; Core Tools, Lighthouse y E2E incluidos      |
+| Proyecto Vercel            | Publicado                 | `https://forjadata.vercel.app`; integración Git desplegando `main` automáticamente |
+| Azure Functions Core Tools | Validado (`func` 4.12.1)  | `pnpm test:functions` arranca el host, consulta health y lo detiene                |
+| Alcance elevado            | Riesgo alto               | Vertical slice primero, automatización, trazabilidad y prioridad estricta          |
 
 La preparación y el uso de la prueba gratuita están autorizados con un límite personal de
 EUR 0. El despliegue debe permanecer dentro de las cuotas gratuitas o del crédito promocional,
@@ -188,10 +188,16 @@ real siguen siendo una dependencia externa para cerrar P2 sin simulador.
 | 2026-08-19 | H    | GitHub CI         | CI y CodeQL correctos sobre `2d39ea2`                                   |
 | 2026-08-19 | H    | Vercel            | `https://forjadata.vercel.app` desplegado desde `main`; smoke correcto  |
 | 2026-08-19 | H    | Smoke público     | Landing, acceso demo y vistas `/app` sin errores de consola             |
+| 2026-08-19 | E    | Bicep             | Corregidas 5 colisiones de nombre de despliegue anidado en `infra`      |
+| 2026-08-19 | E    | `azd provision`   | 13 recursos creados en `rg-forjadata-forjadata-dev` en 4m02s            |
+| 2026-08-19 | E    | `azd deploy`      | API en Functions Flex y SPA en Static Web Apps desplegadas en 3m23s     |
+| 2026-08-19 | E    | Readiness Azure   | Entra, Blob, Service Bus, Document Intelligence y OpenAI reales healthy |
+| 2026-08-19 | E    | Entra redirects   | Callback de Static Web Apps registrado por el hook `postprovision`      |
+| 2026-08-19 | E    | Smoke Azure SPA   | Rutas profundas, cabeceras y 404 de recursos correctos sin errores      |
 
 ## Próximos pasos
 
-1. Completar el login interactivo de AZD y ejecutar `azd provision --preview --no-prompt`.
-2. Cerrar `azure-validate`, desplegar P1 y verificar cada integración real en Azure.
-3. Obtener un endpoint SAP OData y secretos mediante un canal seguro para la prueba real.
-4. Registrar costes observados en Azure y cierre final.
+1. Obtener un endpoint SAP OData y secretos mediante un canal seguro para la prueba real.
+2. Sustituir el valor por defecto `newGuid()` de la contraseña de PostgreSQL por un secreto
+   estable para que `azd provision` sea idempotente y no la rote en cada ejecución.
+3. Registrar costes observados en Azure y cierre final.
